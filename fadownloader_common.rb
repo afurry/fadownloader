@@ -11,8 +11,9 @@ require 'sqlite3'
 require 'rbconfig'
 require 'natural_sort_kernel'
 require 'yaml'
-
 require 'singleton'
+require 'uri'
+
 class AppConfig
   include Singleton
 
@@ -286,7 +287,9 @@ def downloadfrompage(key, agent, db)
 #      p art_page
       return nil
     end
-    image_url = imagelink.href
+    uri = URI(imagelink.href)
+    if uri.scheme == nil: uri.scheme = "http" end
+    image_url = uri.to_s
   end
 
   ## get filename and image creation time
