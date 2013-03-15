@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+# gem install mechanize naturalsort sqlite3 addressable
+
 # built-in
 require 'optparse'
 require 'logger'
@@ -51,6 +53,7 @@ logs "Being verbose"
 #agent = Mechanize.new { |a| a.log = Logger.new("mech.log") }
 agent = Mechanize.new
 agent.max_history = 0
+agent.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.28.10 (KHTML, like Gecko) Version/6.0.3 Safari/536.28.10"
 
 ## initialise database
 db = AppDatabase.new(appconfig[:database_filepath])
