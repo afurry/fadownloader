@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+# gem install mechanize naturalsort sqlite3 addressable
+
 # built-in
 require 'optparse'
 require 'logger'
@@ -13,6 +15,7 @@ require 'natural_sort_kernel'
 require 'yaml'
 require 'singleton'
 require 'uri'
+require 'addressable/uri'
 
 class AppConfig
   include Singleton
@@ -287,7 +290,8 @@ def downloadfrompage(key, agent, db)
 #      p art_page
       return nil
     end
-    uri = URI(imagelink.href)
+    uri = Addressable::URI.parse(imagelink.href)
+    # uri = URI(URI.escape(imagelink.href, Regexp.new("[^#{URI::REGEXP::PATTERN::UNRESERVED}]", false, 'N')))
     if uri.scheme == nil: uri.scheme = "http" end
     image_url = uri.to_s
   end
