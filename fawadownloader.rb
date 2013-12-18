@@ -82,9 +82,10 @@ while true do
 
   form = page.form_with(:name => 'messages-form')
   if form == nil
+    logs "No images on page, exiting"
+    exit
     sleeptime = 60
     logs "No images on page, checking page every #{sleeptime} seconds" if didsleep == false
-    exit
     sleep sleeptime
     page = agent.get(url)
     didsleep = true
@@ -125,8 +126,11 @@ while true do
 
     # image without an href -- deleted image, don't download, already marked for removal by FA
     link = page.link_with(:href => key)
-    logs "Image " + key + " was deleted by author, skipping it" if link == nil
-    next if link == nil
+    if link == nil
+      logs "Image " + key + " was deleted by author, marking as viewed"
+      form.checkbox_with(:value => pictures[key]).check
+      next
+    end
 
     log_print "Getting image #{key} (#{counter} of #{pictures.length})"
 

@@ -314,10 +314,16 @@ def downloadfrompage(key, agent, db)
     escaped_image_url = URI.escape(image_url, Regexp.new("[^#{URI::PATTERN::UNRESERVED+'/:'}]"))
     image = agent.get(escaped_image_url)
   rescue Timeout::Error
-    $stderr.puts " Couldn't get image #{art_page_url} -- #{image_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: #{$!.inspect} -- skipping"
     return nil
+  rescue Mechanize::ResponseCodeError
+    if $!.response_code == '404'
+      db.set_image_url(key, image_url)
+      $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: 404 Net::HTTPNotFound -- marking as viewed"
+      return filename
+    else raise end
   rescue
-    $stderr.puts " Couldn't get image #{art_page_url} -- #{image_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: #{$!.inspect} -- skipping"
     return nil
   end
 
