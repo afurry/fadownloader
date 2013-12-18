@@ -41,7 +41,7 @@ class AppConfig
     ## Settings/Options
     ## Different paths for linux/macosx/windows
     #####################
-    case Config::CONFIG['host_os']
+    case RbConfig::CONFIG['host_os']
     when /mswin|windows|mingw/i
       # Windows
       @data[:settings_directory] = File.expand_path("~/.#{@data[:program_identity_lean]}")
@@ -291,8 +291,7 @@ def downloadfrompage(key, agent, db)
       return nil
     end
     uri = Addressable::URI.parse(imagelink.href)
-    # uri = URI(URI.escape(imagelink.href, Regexp.new("[^#{URI::REGEXP::PATTERN::UNRESERVED}]", false, 'N')))
-    if uri.scheme == nil: uri.scheme = "http" end
+    if uri.scheme == nil then uri.scheme = "http" end
     image_url = uri.to_s
   end
 
