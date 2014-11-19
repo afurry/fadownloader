@@ -14,7 +14,6 @@ require 'rbconfig'
 require 'natural_sort_kernel'
 require 'yaml'
 require 'singleton'
-require 'uri'
 require 'addressable/uri'
 
 class AppConfig
@@ -84,30 +83,6 @@ class AppConfig
     @username = value
     @data[:cookies_filepath] = File.expand_path("#{@data[:settings_directory]}/cookies.#{value}.txt")
   end
-
-### Unused
-
-#  def update!(data)
-#    data.each do |key, value|
-#      self[key] = value
-#    end
-#  end
-
-#  def []=(key, value)
-#    if value.class == Hash
-#      @data[key.to_sym] = Config.new(value)
-#    else
-#      @data[key.to_sym] = value
-#    end
-#  end
-
-#  def method_missing(sym, *args)
-#    if sym.to_s =~ /(.+)=$/
-#      self[$1] = args.first
-#    else
-#      self[sym]
-#    end
-#  end
 end
 
 
@@ -271,14 +246,14 @@ def downloadfrompage(key, agent, db)
 
   ## get image page
   log_print "."
-  art_page_url = "#{appconfig[:url_base]}/#{key}"
+  artpage_uri = "#{appconfig[:url_base]}/#{key}"
   begin
-    art_page = agent.get(art_page_url)
+    art_page = agent.get(artpage_uri.to_s)
   rescue Timeout::Error
-    $stderr.puts " Couldn't get page #{art_page_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
     return nil
   rescue
-    $stderr.puts " Couldn't get page #{art_page_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
     return nil
   end
 
@@ -286,17 +261,19 @@ def downloadfrompage(key, agent, db)
   begin
     imagelink = art_page.link_with(:text => /Download/)
     if (!imagelink)
-      $stderr.puts " Got a page #{art_page_url} without a download link -- skipping"
+      $stderr.puts " Got a page #{artpage_uri.to_s} without a download link -- skipping"
 #      p art_page
       return nil
     end
-    uri = Addressable::URI.parse(imagelink.href)
-    if uri.scheme == nil then uri.scheme = "http" end
-    image_url = uri.to_s
+    image_uri = Addressable::URI.parse(imagelink.href).normalize
+    if image_uri.scheme == nil then image_uri.scheme = "http" end
+  rescue
+    $stderr.puts " Couldn't get page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
+    return nil
   end
 
   ## get filename and image creation time
-  filename = File.basename(image_url)
+  filename = Addressable::URI.unencode_component(image_uri.basename)
   filepath = "#{appconfig.download_directory}/#{filename}"
   imagetime = (filename.scan(/\d{10}/)[0]).to_i
 
@@ -304,26 +281,19 @@ def downloadfrompage(key, agent, db)
   if (File.exist?(filepath) && File.size(filepath) > 0)
     logs " skipping #{filename}, already downloaded."
     setimagetime(filepath, imagetime)
-    db.set_image_url(key, image_url)
+    db.set_image_url(key, image_uri.to_s)
     return filename
   end
 
   ## get the image
   log_print "."
   begin
-    escaped_image_url = URI.escape(image_url, Regexp.new("[^#{URI::PATTERN::UNRESERVED+'/:'}]"))
-    image = agent.get(escaped_image_url)
+    image = agent.get(image_uri.to_s)
   rescue Timeout::Error
-    $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get image #{image_uri.to_s} from page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
     return nil
-  rescue Mechanize::ResponseCodeError
-    if $!.response_code == '404'
-      db.set_image_url(key, image_url)
-      $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: 404 Net::HTTPNotFound -- marking as viewed"
-      return filename
-    else raise end
   rescue
-    $stderr.puts " Couldn't get image #{image_url} from page #{art_page_url}: #{$!.inspect} -- skipping"
+    $stderr.puts " Couldn't get image #{image_uri.to_s} from page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
     return nil
   end
 
@@ -331,7 +301,7 @@ def downloadfrompage(key, agent, db)
 
   image.save(filepath)  
   setimagetime(filepath, imagetime)
-  db.set_image_url(key, image_url, last_modified)
+  db.set_image_url(key, image_uri.to_s, last_modified)
 
   logs " " + filename
   return filename
