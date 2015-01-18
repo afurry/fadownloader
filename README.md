@@ -1,6 +1,6 @@
 #Furaffinity Downloader
 
-This was made for personal use, but decided to upload just in case someone else finds it useful.
+This was made for personal use, but decided to upload just in case someone else finds it useful and wants to have a personal copy of fur affinity art.
 
 Before you can use it, install some gems:
 ```ruby
