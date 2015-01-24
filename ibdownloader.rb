@@ -73,8 +73,8 @@ class AppConfig
   attr_accessor :cookies_filepath, :database_filepath, :config_filepath, :settings_directory
 
   def loadconfig
-  	file_contents = YAML::load_file(self.config_filepath)
-  	raise "Config file #{self.config_filepath} is empty" if file_contents == false
+    file_contents = YAML::load_file(self.config_filepath)
+    raise "Config file #{self.config_filepath} is empty" if file_contents == false
     loaded = Hash[file_contents.map { |k, v| [k.to_sym, v] }]
     raise "No username is set in config file" if loaded[:username] == nil
     raise "No password is set in config file" if loaded[:password] == nil
@@ -88,7 +88,7 @@ class AppConfig
   end
 
   def settings_directory=(value)
-  	@settings_directory = value
+    @settings_directory = value
     self.cookies_filepath = File.expand_path("#{value}/cookies.txt")
     self.database_filepath = File.expand_path("#{value}/downloaded.sqlite")
     self.config_filepath = File.expand_path("#{value}/config.yaml")
@@ -123,16 +123,16 @@ agent.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/5
 FileUtils.mkpath app.settings_directory
 
 begin
-	app.loadconfig
+  app.loadconfig
 rescue
-	$stderr.puts "Couldn't load configuration -- #{$!.inspect}"
-	$stderr.puts ""
-	$stderr.puts "Please create a file '#{app.config_filepath}' with contents like this:"
-	$stderr.puts "username: <your username>"
-	$stderr.puts "password: <your password>"
-	$stderr.puts ""
-	$stderr.puts "And run this program again"
-	exit 1
+  $stderr.puts "Couldn't load configuration -- #{$!.inspect}"
+  $stderr.puts ""
+  $stderr.puts "Please create a file '#{app.config_filepath}' with contents like this:"
+  $stderr.puts "username: <your username>"
+  $stderr.puts "password: <your password>"
+  $stderr.puts ""
+  $stderr.puts "And run this program again"
+  exit 1
 end
 
 ## TODO: command line arguments
@@ -149,41 +149,41 @@ page = agent.get(app.url_base)
 
 ## login
 def do_login(app, agent, page)
-	return page if is_logged_in?(app, agent, page)
-	logs "Looking for login link"
-	link = page.link_with!(:href => 'login.php')
+  return page if is_logged_in?(app, agent, page)
+  logs "Looking for login link"
+  link = page.link_with!(:href => 'login.php')
 
-	logs "Clicking login link"
-	page = link.click
+  logs "Clicking login link"
+  page = link.click
 
-	logs "Looking for login form and filling it"
-	form = page.form_with(:action => 'login_process.php')
-	form.field_with(:name => "username").value = app.username
-	form.field_with(:name => "password").value = app.password
+  logs "Looking for login form and filling it"
+  form = page.form_with(:action => 'login_process.php')
+  form.field_with(:name => "username").value = app.username
+  form.field_with(:name => "password").value = app.password
 
-	logs "Looking for login button"
-	button = form.button_with(:value => 'Login')
+  logs "Looking for login button"
+  button = form.button_with(:value => 'Login')
 
-	logs "Pressing login button"
-	page = form.click_button(button)
-	# page = agent.submit(form, button)
+  logs "Pressing login button"
+  page = form.click_button(button)
+  # page = agent.submit(form, button)
 
-	logs "Saving cookies"
-	agent.cookie_jar.save_as(app.cookies_filepath, :cookiestxt)
+  logs "Saving cookies"
+  agent.cookie_jar.save_as(app.cookies_filepath, :cookiestxt)
 end
 
 def is_logged_in?(app, agent, page)
-	logs "Checking if we are logged in"
-	## TODO: check if we are on inkbunny
+  logs "Checking if we are logged in"
+  ## TODO: check if we are on inkbunny
 
-	link = page.link_with(:href => 'login.php')
-	return false if link
+  link = page.link_with(:href => 'login.php')
+  return false if link
 
-	link = page.link_with(:text => 'Logout')
-	return true if link
+  link = page.link_with(:text => 'Logout')
+  return true if link
 
-	## TODO: throw an exception
-	raise "We are neither logged in or logged out"
+  ## TODO: throw an exception
+  raise "We are neither logged in or logged out"
 end
 
 logs "Logging in if necessary"
@@ -193,49 +193,49 @@ pictures = Hash.new
 
 ## go over every artist
 ARGV.each do |artist|
-	logs "Going to page of artist #{artist}..."
-	page = agent.get("#{app.url_base}/#{artist}")
-	gallery_link = page.link_with(href: /^usergallery_process\.php/, text: 'Gallery')
+  logs "Going to page of artist #{artist}..."
+  page = agent.get("#{app.url_base}/#{artist}")
+  gallery_link = page.link_with(href: /^usergallery_process\.php/, text: 'Gallery')
 
-	## iterate over gallery pages and remember pictures
-	while gallery_link
-		logs "Going to artist's gallery page #{gallery_link.href}..."
-		# logs
-		page = gallery_link.click
-		page.links_with(href: /^submissionview\.php/).each do |link|
-			pictures[link] = true
-		end
-		gallery_link = page.link_with(href: /^submissionsviewall\.php/, text: /Next Page/)
-	end
+  ## iterate over gallery pages and remember pictures
+  while gallery_link
+    logs "Going to artist's gallery page #{gallery_link.href}..."
+    # logs
+    page = gallery_link.click
+    page.links_with(href: /^submissionview\.php/).each do |link|
+      pictures[link] = true
+    end
+    gallery_link = page.link_with(href: /^submissionsviewall\.php/, text: /Next Page/)
+  end
 end
 
 ## download pictures
 pictures.keys.each do |link|
-	next if db[link.href] != nil ## skip already downloaded picture
-	log_print "Going to image page #{link.uri}"
-	page = link.click
-	# p page.images
-	image_link = page.link_with(href: %r{/files/full/}, text: /max\.? *preview|download/i)
-	if image_link == nil
-		image_link = page.image_with!(src: %r{/files/screen/}) 
-		image_url = image_link.src
-		log_print " - downloading image #{image_url}"
-		image = image_link.fetch
-	else
-		image_url = image_link.href
-		log_print " - downloading image #{image_url}"
-		image = image_link.click
-	end
-	
-	logs " - saving"
-	filename = File.basename(image_url)
-	filepath = "#{app.download_directory}/#{filename}"
-	image.save_as(filepath)
+  next if db[link.href] != nil ## skip already downloaded picture
+  log_print "Going to image page #{link.uri}"
+  page = link.click
+  # p page.images
+  image_link = page.link_with(href: %r{/files/full/}, text: /max\.? *preview|download/i)
+  if image_link == nil
+    image_link = page.image_with!(src: %r{/files/screen/})
+    image_url = image_link.src
+    log_print " - downloading image #{image_url}"
+    image = image_link.fetch
+  else
+    image_url = image_link.href
+    log_print " - downloading image #{image_url}"
+    image = image_link.click
+  end
 
-	## set file time
-	last_modified = Time.parse(image.response["Last-Modified"])
-	File.utime(last_modified, last_modified, filepath)
+  logs " - saving"
+  filename = File.basename(image_url)
+  filepath = "#{app.download_directory}/#{filename}"
+  image.save_as(filepath)
 
-	db.remember_picture(link.href, image_url)
+  ## set file time
+  last_modified = Time.parse(image.response["Last-Modified"])
+  File.utime(last_modified, last_modified, filepath)
+
+  db.remember_picture(link.href, image_url)
 end
 
