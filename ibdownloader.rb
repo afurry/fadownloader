@@ -204,32 +204,36 @@ ARGV.each do |artist|
 end
 
 ## download pictures
-pictures.keys.each do |link|
+pictures.keys.each do |orig_link|
   next if db[link.href] != nil ## skip already downloaded picture
-  log_print "Going to image page #{link.uri}"
-  page = link.click
-  # p page.images
-  image_link = page.link_with(href: %r{/files/full/}, text: /max\.? *preview|download/i)
-  if image_link == nil
-    image_link = page.image_with!(src: %r{/files/screen/})
-    image_url = image_link.src
+  link = orig_link
+  while link
+    log_print "Going to image page #{link.uri}"
+    page = link.click
+    image_link = page.link_with(href: %r{/files/full/}, text: /max\.? *preview|download/i)
+    if image_link == nil
+      image_link = page.image_with!(src: %r{/files/screen/})
+      image_url = image_link.src
+    else
+      image_url = image_link.href
+    end
     log_print " - downloading image #{image_url}"
-    image = image_link.fetch
-  else
-    image_url = image_link.href
-    log_print " - downloading image #{image_url}"
-    image = image_link.click
+
+    filename = File.basename(image_url)
+    filepath = "#{app.download_directory}/#{filename}"
+    if (!File.exist?(filepath) || File.size(filepath) == 0)
+      logs " - saving"
+      image = agent.download(image_url, filepath, [], page.uri)
+      ## set file time
+      last_modified = Time.parse(image.response["Last-Modified"])
+      File.utime(last_modified, last_modified, filepath)
+    else
+      logs " - already downloaded"
+    end
+
+    db.remember_picture(link.href, image_url)
+
+    link = page.link_with(href: /^#{Regexp.escape(link.href)}/, text: /next/i);
   end
-
-  logs " - saving"
-  filename = File.basename(image_url)
-  filepath = "#{app.download_directory}/#{filename}"
-  image.save_as(filepath)
-
-  ## set file time
-  last_modified = Time.parse(image.response["Last-Modified"])
-  File.utime(last_modified, last_modified, filepath)
-
-  db.remember_picture(link.href, image_url)
 end
 
