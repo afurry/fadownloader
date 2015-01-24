@@ -2,17 +2,11 @@
 
 # gem install mechanize sqlite3
 
-# built-in
-# require 'optparse'
-# require 'logger'
-
 # ruby gems
-# require 'rubygems'
+require 'rubygems'
 require 'mechanize'
-# require 'rbconfig'
-# require 'natural_sort_kernel'
-# require 'yaml'
-# require 'time'
+require 'yaml'
+require 'time'
 require 'singleton'
 require 'sqlite3'
 
