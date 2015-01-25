@@ -205,8 +205,8 @@ end
 
 ## download pictures
 pictures.keys.each do |orig_link|
-  next if db[link.href] != nil ## skip already downloaded picture
   link = orig_link
+  next if db[link.href] != nil ## skip already downloaded picture
   while link
     log_print "Going to image page #{link.uri}"
     page = link.click
