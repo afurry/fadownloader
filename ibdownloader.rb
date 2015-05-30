@@ -97,7 +97,7 @@ class AppDatabase
   end
   
   def [](image_page_url)
-    result = @db.execute("SELECT image_url FROM image_urls WHERE page_url = :page_url LIMIT 1", "page_url" => image_page_url)
+    result = @db.execute("SELECT page_url, image_url FROM image_urls WHERE page_url = :page_url LIMIT 1", "page_url" => image_page_url)
     return nil if result == nil
     return nil if result.empty?
     return result[0][0], result[0][1]
@@ -106,6 +106,16 @@ class AppDatabase
   def remember_picture(image_page_url, image_url)
     @db.execute("INSERT OR REPLACE INTO image_urls (page_url, image_url) VALUES (:page_url, :image_url)",
                "page_url" => image_page_url, "image_url" => image_url)
+  end
+
+  def remove_already_downloaded(pictures_raw)
+    pictures = Array.new
+    pictures_raw.each do |value|
+      ## get from database
+      next if self[value.href] != nil
+      pictures << value
+    end
+    return pictures
   end
 end
 
@@ -183,28 +193,40 @@ end
 logs "Logging in if necessary"
 page = do_login(app, agent, page)
 
-pictures = Hash.new
+pictures = Array.new
 
 ## go over every artist
 ARGV.each do |artist|
-  logs "Going to page of artist #{artist}..."
   page = agent.get("#{app.url_base}/#{artist}")
   gallery_link = page.link_with(href: /^usergallery_process\.php/, text: 'Gallery')
 
   ## iterate over gallery pages and remember pictures
   while gallery_link
-    logs "Going to artist's gallery page #{gallery_link.href}..."
+    page_num = 1
+    params = CGI.parse(URI.parse(gallery_link.href).query)
+    page_num = params["page"][0] if (params["page"][0] != nil)
+    log_print "Going to #{artist}'s gallery page ##{page_num}"
     # logs
     page = gallery_link.click
+    page_pictures = Array.new
     page.links_with(href: /^submissionview\.php/).each do |link|
-      pictures[link] = true
+      page_pictures << link
     end
+    numlinks = page_pictures.length
+    page_pictures = db.remove_already_downloaded(page_pictures)
+    numnewlinks = page_pictures.length
+    if numnewlinks == 0
+      logs " - No more new links found"
+      break
+    end
+    pictures = pictures + page_pictures
+    logs " - Got #{numlinks} links and #{numnewlinks} new links"
     gallery_link = page.link_with(href: /^submissionsviewall\.php/, text: /Next Page/)
   end
 end
 
 ## download pictures
-pictures.keys.each do |orig_link|
+pictures.each do |orig_link|
   link = orig_link
   next if db[link.href] != nil ## skip already downloaded picture
   while link
