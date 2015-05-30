@@ -121,6 +121,10 @@ while true do
   end
 
   numchecked = form.checkboxes_with(:name => /submissions/, :checked => true).length
+  if numchecked == 0
+    logs "No images checked, exiting"
+    exit
+  end
   logs "Marking #{numchecked} images as viewed"
   button = form.button_with(:value => "Remove checked")
   page = form.click_button(button)
