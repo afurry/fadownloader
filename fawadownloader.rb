@@ -24,8 +24,6 @@ require 'fadownloader_common'
 ## TODO: use a HEAD request and compare metadata
 appconfig = AppConfig.instance
 
-
-
 FileUtils.mkpath appconfig[:settings_directory]
 
 #####################
@@ -77,19 +75,10 @@ page = agent.get(url)
 didsleep = false
 
 while true do
-  
-#  p page
-
   form = page.form_with(:name => 'messages-form')
   if form == nil
     logs "No images on page, exiting"
     exit
-    sleeptime = 60
-    logs "No images on page, checking page every #{sleeptime} seconds" if didsleep == false
-    sleep sleeptime
-    page = agent.get(url)
-    didsleep = true
-    next
   end
   didsleep = false
   checkboxes = form.checkboxes_with(:name => /submissions/)
@@ -103,17 +92,8 @@ while true do
   pictures = Hash.new
   checkboxes.each do |box|
     image_url = '/view/' + box.value + '/'
-
-    
-
-    # if in database, we've downloaded it already, mark image for removal
-#    box.check if dbvalue != nil
-#    next if dbvalue != nil
-
-
     pictures[image_url] = box.value
   end
-  
 
   logs "Nothing new to download" if pictures.length == 0
 
@@ -123,7 +103,6 @@ while true do
   counter = 0
   pictures.keys.natural_sort.each do |key|
     counter += 1
-
     # image without an href -- deleted image, don't download, already marked for removal by FA
     link = page.link_with(:href => key)
     if link == nil
