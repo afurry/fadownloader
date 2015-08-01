@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# gem install mechanize sqlite3
+# gem install mechanize sqlite3 xdg
 
 # ruby gems
 require 'rubygems'

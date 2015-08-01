@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# gem install mechanize naturalsort sqlite3 addressable
+# gem install mechanize naturalsort sqlite3 addressable xdg
 
 # built-in
 require 'optparse'
