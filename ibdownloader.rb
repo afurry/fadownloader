@@ -156,7 +156,8 @@ page = agent.get(app.url_base)
 def do_login(app, agent, page)
   return page if is_logged_in?(app, agent, page)
   logs "Looking for login link"
-  link = page.link_with!(:href => 'login.php')
+  link = page.link_with(:href => 'login.php')
+  raise "Page doesn't have link to login.php" if link == nil
 
   logs "Clicking login link"
   page = link.click
