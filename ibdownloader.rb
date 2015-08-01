@@ -9,6 +9,7 @@ require 'yaml'
 require 'time'
 require 'singleton'
 require 'sqlite3'
+require 'xdg'
 
 def logs(string)
   puts string
@@ -41,7 +42,7 @@ class AppConfig
       self.settings_directory = File.expand_path("~/Library/Application Support/#{@data[:program_identity_lean]}")
     else
       # Generic unix
-      self.settings_directory = File.expand_path("~/.#{@data[:program_identity_short]}")
+      self.settings_directory = File.expand_path("#{XDG['CONFIG_HOME']}/#{@data[:program_identity_short]}")
     end
 
     self.download_directory = File.expand_path("~/Pictures/#{@data[:program_identity_lean_nospace]}")

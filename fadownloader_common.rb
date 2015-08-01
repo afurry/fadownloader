@@ -15,6 +15,7 @@ require 'natural_sort_kernel'
 require 'yaml'
 require 'singleton'
 require 'addressable/uri'
+require 'xdg'
 
 class AppConfig
   include Singleton
@@ -41,15 +42,12 @@ class AppConfig
     ## Different paths for linux/macosx/windows
     #####################
     case RbConfig::CONFIG['host_os']
-    when /mswin|windows|mingw/i
-      # Windows
-      @data[:settings_directory] = File.expand_path("~/.#{@data[:program_identity_lean]}")
     when /darwin/i
       # MacOSX
       @data[:settings_directory] = File.expand_path("~/Library/Application Support/#{@data[:program_identity_lean]}")
     else
       # Generic unix
-      @data[:settings_directory] = File.expand_path("~/.#{@data[:program_identity_short]}")
+      @data[:settings_directory] = File.expand_path("#{XDG['CONFIG_HOME']}/#{@data[:program_identity_short]}")
     end
 
     @data[:cookies_filepath] = File.expand_path("#{@data[:settings_directory]}/cookies.txt")
