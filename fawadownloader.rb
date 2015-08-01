@@ -57,7 +57,18 @@ agent.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/5
 db = AppDatabase.new(appconfig[:database_filepath])
 
 ## load config
-appconfig.loadconfig
+begin
+  appconfig.loadconfig
+rescue
+  $stderr.puts "Couldn't load configuration -- #{$!.inspect}"
+  $stderr.puts ""
+  $stderr.puts "Please create a file '#{appconfig[:config_filepath]}' with contents like this:"
+  $stderr.puts "username: <your username>"
+  $stderr.puts "password: <your password>"
+  $stderr.puts ""
+  $stderr.puts "And run this program again"
+  exit 1
+end
 
 ## load cookies
 agent.cookie_jar.load(appconfig[:cookies_filepath], :cookiestxt) if File.exists?(appconfig[:cookies_filepath])
