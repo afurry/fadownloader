@@ -1,12 +1,11 @@
 #!/usr/bin/env ruby
 
-# gem install mechanize naturalsort sqlite3 addressable xdg
-
 # built-in
 require 'optparse'
 require 'logger'
 
 # ruby gems
+begin
 require 'rubygems'
 require 'mechanize'
 require 'sqlite3'
@@ -16,6 +15,11 @@ require 'yaml'
 require 'singleton'
 require 'addressable/uri'
 require 'xdg'
+rescue LoadError => e
+    print "Missing gems: #{e.inspect}\n\n"
+    print "Do this: gem install mechanize naturalsort sqlite3 addressable xdg\n\n"
+    exit
+end
 
 class AppConfig
   include Singleton

@@ -1,19 +1,5 @@
 #!/usr/bin/env ruby
 
-# gem install mechanize naturalsort sqlite3 addressable
-
-# built-in
-require 'optparse'
-require 'logger'
-
-# ruby gems
-require 'rubygems'
-require 'mechanize'
-require 'rbconfig'
-require 'natural_sort_kernel'
-require 'yaml'
-
-# our own
 $: << File.dirname(__FILE__)
 require 'fadownloader_common'
 
