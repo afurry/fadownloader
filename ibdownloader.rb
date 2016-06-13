@@ -236,7 +236,7 @@ pictures.each do |orig_link|
     page = link.click
     image_link = page.link_with(href: %r{/files/full/}, text: /max\.? *preview|download/i)
     if image_link == nil
-      image_link = page.image_with!(src: %r{/files/screen/})
+      image_link = page.image_with!(src: %r{/files/(screen|full)/})
       image_url = image_link.src
     else
       image_url = image_link.href
