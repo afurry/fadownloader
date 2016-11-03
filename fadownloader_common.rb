@@ -130,6 +130,7 @@ def check_and_login(agent, page)
   appconfig = AppConfig.instance
   ## check if we need to log in
   link = page.link_with(:href => /\/login/)
+  agent.cookie_jar.save_as(appconfig[:cookies_filepath], :cookiestxt)
   if link.text == "Log in"
     logs "Not logged in, need to log in"
     page = do_login(agent, page)
