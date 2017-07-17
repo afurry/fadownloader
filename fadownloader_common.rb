@@ -115,6 +115,8 @@ def do_login(agent, page)
   puts 'page is nil' if !page
   return nil if !page
 
+  agent.cookie_jar.save_as(appconfig[:cookies_filepath], :cookiestxt)
+
   ## fill a login form
   login_form = page.form_with(:action => /\/login\//)
   login_form.field_with(:name => "name").value = appconfig.username
