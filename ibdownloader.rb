@@ -256,8 +256,7 @@ pictures.each do |orig_link|
     end
 
     db.remember_picture(link.href, image_url)
-
-    link = page.link_with(href: /^#{Regexp.escape(link.href)}/, text: /next/i);
+    link = page.link_with(text: /^next$/i);
   end
 end
 
