@@ -123,7 +123,7 @@ while true do
     exit
   end
   logs "Marking #{numchecked} images as viewed"
-  button = form.button_with(:value => "Remove checked")
+  button = form.button_with(:value => "remove_checked")
   page = form.click_button(button)
 
 end
