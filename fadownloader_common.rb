@@ -1,5 +1,14 @@
 #!/usr/bin/env ruby
 
+begin
+require 'rubygems'
+require 'bundler/setup'
+rescue LoadError => e
+    print "Missing gems: #{e.inspect}\n\n"
+    print "Do this: gem install pkg-config bundler && bundler"
+    exit
+end
+
 # built-in
 require 'optparse'
 require 'logger'
