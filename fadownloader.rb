@@ -86,12 +86,14 @@ page = check_and_login(agent, page)
 pictures = Hash.new
 
 ## gather links
+agent.history_added = Proc.new { sleep 0.1 }
 ARGV.each do |artistname|
   logs "Scanning artist #{artistname} for links..."
   pictures.merge!(gather_links_from_artist(db, agent, page, artistname, appconfig[:url_gallery])) if appconfig.gallery
   pictures.merge!(gather_links_from_artist(db, agent, page, artistname, appconfig[:url_favourites])) if appconfig.favourites
   pictures.merge!(gather_links_from_artist(db, agent, page, artistname, appconfig[:url_scraps])) if appconfig.scraps
 end
+agent.history_added = nil
 
 puts "Nothing to download" if pictures.length == 0
 exit if pictures.length == 0
