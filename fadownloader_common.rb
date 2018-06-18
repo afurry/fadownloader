@@ -158,26 +158,25 @@ end
 ##
 def gather_links_from_artist(db, agent, page, artistname, url_listing)
   appconfig = AppConfig.instance
-  pagenum = 0
+  pagenum = 1
   validlinks = Hash.new
+  page = check_and_login(agent, page)
+  escaped_artist_name = CGI::escape(artistname)
+  listing_url = "#{appconfig[:url_base]}/#{url_listing}/#{escaped_artist_name}/"
+  log_print "Going to #{artistname}'s #{url_listing} page ##{pagenum}... "
+  begin
+    page = agent.get(listing_url)
+  rescue Timeout::Error
+    $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- stopping"
+    return validlinks
+  rescue Mechanize::ResponseCodeError
+    $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- stopping"
+    return validlinks
+  rescue
+    $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- stopping"
+    return validlinks
+  end
   while true
-    pagenum+=1
-    page = check_and_login(agent, page)
-    log_print "Going to #{artistname}'s #{url_listing} page ##{pagenum}... "
-    escaped_artist_name = CGI::escape(artistname)
-    listing_url = "#{appconfig[:url_base]}/#{url_listing}/#{escaped_artist_name}/#{pagenum}"
-    begin
-      page = agent.get(listing_url)
-    rescue Timeout::Error
-      $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- skipping"
-      next
-    rescue Mechanize::ResponseCodeError
-      $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- stopping"
-      break
-    rescue
-      $stderr.puts "Couldn't get page #{listing_url}: #{$!.inspect} -- skipping"
-      next
-    end
     links = page.links_with(:href => /^\/view/)
     logs "No more valid links found" if links.length == 0
     break if links.length == 0
@@ -188,10 +187,32 @@ def gather_links_from_artist(db, agent, page, artistname, url_listing)
     numvalidlinks = validlinks.length-oldlength
     validlinks = remove_already_downloaded(db, validlinks)
     numnewlinks = validlinks.length-oldlength
-    logs "No more new links found" if numnewlinks == 0 and appconfig.fastscan
-    break if numnewlinks == 0 and appconfig.fastscan
+    if numnewlinks == 0 and appconfig.fastscan
+      logs "No more new links found"
+      break
+    end
     logs "Got #{numvalidlinks} valid and #{numnewlinks} new links"
-  end
+    pagenum+=1
+    link = page.link_with(:text => 'Next  ❯❯')
+    if !link
+      $stderr.puts "No more #{url_listing} pages for this artist"
+      return validlinks
+    end
+    log_print "Going to #{artistname}'s #{url_listing} page ##{pagenum}... "
+    begin
+      page = link.click
+    rescue Timeout::Error
+      $stderr.puts "Couldn't get page #{link}: #{$!.inspect} -- stopping"
+      return validlinks
+    rescue Mechanize::ResponseCodeError
+      $stderr.puts "Couldn't get page #{link}: #{$!.inspect} -- stopping"
+      return validlinks
+    rescue
+      $stderr.puts "Couldn't get page #{link}: #{$!.inspect} -- stopping"
+      return validlinks
+    end
+    page = check_and_login(agent, page)
+    end
   return validlinks
 end
 
