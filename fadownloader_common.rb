@@ -249,6 +249,11 @@ class AppDatabase
     @db = SQLite3::Database.new(filepath)
     @db.busy_timeout(5000)
     @db.execute("CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT)")
+    @db.execute("CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)");
+    @db.execute("PRAGMA synchronous = OFF");
+    @db.execute("PRAGMA journal_mode = MEMORY");
+    @db.execute("PRAGMA cache_size = 1000000");
+    @db.execute("PRAGMA temp_store = MEMORY");
   end
   
   def [](image_page_url)
