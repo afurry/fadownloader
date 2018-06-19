@@ -298,6 +298,7 @@ def downloadfrompage(key, agent, db)
   end
 
   ## get image links from the page
+  log_print "."
   begin
     imagelink = art_page.link_with(:text => /Download/)
     if (!imagelink)
@@ -313,13 +314,20 @@ def downloadfrompage(key, agent, db)
   end
 
   ## get filename and image creation time
+  log_print "."
   filename = Addressable::URI.unencode_component(image_uri.basename)
   filepath = "#{appconfig.download_directory}/#{filename}"
   imagetime = (filename.scan(/\d{10}/)[0]).to_i
 
-  ## don't download if file exists
-  if (File.exist?(filepath) && File.size(filepath) > 0)
-    logs " skipping #{filename}, already downloaded."
+  ## do HEAD request and get file size
+  log_print "."
+  response = agent.head(image_uri.to_s)
+  imagesize = response["content-length"].to_i
+
+  ## don't download if file exists and file size matches
+  log_print "."
+  if (File.exist?(filepath) && File.size(filepath) > 0 && File.size(filepath) == imagesize)
+    logs " #{filename} (file exists and size matches)"
     setimagetime(filepath, imagetime)
     db.set_image_url(key, image_uri.to_s)
     return filename
@@ -337,8 +345,10 @@ def downloadfrompage(key, agent, db)
     return nil
   end
 
+  log_print "."
   last_modified = image.response["Last-Modified"]
 
+  log_print "."
   image.save(filepath)  
   setimagetime(filepath, imagetime)
   db.set_image_url(key, image_uri.to_s, last_modified)
