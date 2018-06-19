@@ -13,6 +13,7 @@ import (
 	"github.com/beefsack/go-rate"
 	"github.com/headzoo/surf"
 	"github.com/headzoo/surf/browser"
+	"github.com/juju/persistent-cookiejar"
 	"vbom.ml/util/sortorder"
 )
 
@@ -52,12 +53,26 @@ func handleLinks(URL string, handler func(link *browser.Link)) error {
 
 var rl = rate.New(2, time.Second)
 var bow = surf.NewBrowser()
+var jar *cookiejar.Jar
 
 func main() {
 	imagePages := map[string]bool{}
 	images := map[string]bool{}
 
-	bow.SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.28.10 (KHTML, like Gecko) Version/6.0.3 Safari/536.28.10")
+	{
+		var err error
+		jar, err = cookiejar.New(&cookiejar.Options{
+			Filename: "cookies.json",
+		})
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("jar type = %T\n", jar)
+		bow.SetCookieJar(jar)
+		bow.SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.28.10 (KHTML, like Gecko) Version/6.0.3 Safari/536.28.10")
+	}
+	jar.Save()
+	defer jar.Save()
 
 	startPage := "https://www.furaffinity.net/gallery/wolfy-nail/"
 
