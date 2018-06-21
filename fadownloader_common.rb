@@ -321,7 +321,16 @@ def downloadfrompage(key, agent, db)
 
   ## do HEAD request and get file size
   log_print "."
-  response = agent.head(image_uri.to_s)
+  begin
+    response = agent.head(image_uri.to_s)
+  rescue Net::HTTPNotFound
+    $stderr.puts " Couldn't get image #{image_uri.to_s} from page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
+    return nil
+  rescue
+    $stderr.puts " Couldn't get image #{image_uri.to_s} from page #{artpage_uri.to_s}: #{$!.inspect} -- skipping"
+    return nil
+  end
+
   imagesize = response["content-length"].to_i
 
   ## don't download if file exists and file size matches
