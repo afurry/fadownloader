@@ -5,7 +5,7 @@ require 'rubygems'
 require 'bundler/setup'
 rescue LoadError => e
     print "Missing gems: #{e.inspect}\n\n"
-    print "Do this: gem install pkg-config bundler && bundler"
+    print "Do this: gem install pkg-config bundler && bundler\n\n"
     exit
 end
 
