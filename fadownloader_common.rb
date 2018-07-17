@@ -358,7 +358,7 @@ def downloadfrompage(key, agent, db)
   last_modified = image.response["Last-Modified"]
 
   log_print "."
-  image.save(filepath)  
+  image.save!(filepath)
   setimagetime(filepath, imagetime)
   db.set_image_url(key, image_uri.to_s, last_modified)
 
