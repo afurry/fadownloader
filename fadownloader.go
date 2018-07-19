@@ -50,6 +50,9 @@ func OpenURL(URL string) error {
 }
 
 var opts struct {
+	NoGrabGallery     bool   `short:"g" long:"no-grab-gallery" description:"Don't grab artist's gallery"`
+	GrabFavourites    bool   `short:"f" long:"grab-favourites" description:"Grab artist's favourites"`
+	GrabScraps        bool   `short:"s" long:"grab-scraps" description:"Grab artist's scraps"`
 	ConfigDir         string `short:"c" long:"config-directory" description:"Specify config directory" value-name:"dir"`
 	DownloadDirectory string `short:"d" long:"download-directory" description:"Specify download directory" value-name:"dir" default:"~/Pictures/FADownloader"`
 	Help              bool   `short:"h" long:"help" description:"Display this help message"`
@@ -143,35 +146,48 @@ func main() {
 
 	for _, artist := range args {
 		fmt.Printf("Handling artist %s...\n", artist)
-		startPage := fmt.Sprintf("https://www.furaffinity.net/gallery/%s/", artist)
-		// go through every gallery page of this artist and collage image pages
-		nextPageLink := startPage
-		for nextPageLink != "" {
-			galleryPage := nextPageLink
-			nextPageLink = ""
-			// haveImagePages := false
-			fmt.Printf("Handling page %s...", galleryPage)
-			err := OpenURL(galleryPage)
-			if err != nil {
-				fmt.Printf("Got error while getting %s: %v\n", galleryPage, err)
-				continue
-			}
+		pageTypes := []string{}
+		if !opts.NoGrabGallery {
+			pageTypes = append(pageTypes, "gallery")
+		}
+		if opts.GrabFavourites {
+			pageTypes = append(pageTypes, "favorites")
+		}
+		if opts.GrabScraps {
+			pageTypes = append(pageTypes, "scraps")
+		}
 
-			fmt.Printf(".")
-			newImagePages := map[string]string{}
-			for _, link := range bow.Links() {
-				if strings.Contains(link.URL.Path, "/view/") {
-					newImagePages[link.URL.String()] = artist
-					// haveImagePages = true
+		for _, pageType := range pageTypes {
+			startPage := fmt.Sprintf("https://www.furaffinity.net/%s/%s/", pageType, artist)
+			// go through every gallery page of this artist and collage image pages
+			nextPageLink := startPage
+			for nextPageLink != "" {
+				galleryPage := nextPageLink
+				nextPageLink = ""
+				// haveImagePages := false
+				fmt.Printf("Handling page %s...", galleryPage)
+				err := OpenURL(galleryPage)
+				if err != nil {
+					fmt.Printf("Got error while getting %s: %v\n", galleryPage, err)
+					continue
 				}
-				if link.Text == "Next  ❯❯" {
-					url := link.URL.String()
-					nextPageLink = url
+
+				fmt.Printf(".")
+				newImagePages := map[string]string{}
+				for _, link := range bow.Links() {
+					if strings.Contains(link.URL.Path, "/view/") {
+						newImagePages[link.URL.String()] = artist
+						// haveImagePages = true
+					}
+					if link.Text == "Next  ❯❯" {
+						url := link.URL.String()
+						nextPageLink = url
+					}
 				}
-			}
-			fmt.Printf(" Got %d images\n", len(newImagePages))
-			for k, v := range newImagePages {
-				imagePages[k] = v
+				fmt.Printf(" Got %d images\n", len(newImagePages))
+				for k, v := range newImagePages {
+					imagePages[k] = v
+				}
 			}
 		}
 	}
