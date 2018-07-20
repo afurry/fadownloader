@@ -141,12 +141,10 @@ func main() {
 
 		for _, pageType := range pageTypes {
 			startPage := fmt.Sprintf("https://www.furaffinity.net/%s/%s/", pageType, artist)
-			// go through every gallery page of this artist and collage image pages
 			nextPageLink := startPage
 			for nextPageLink != "" {
 				galleryPage := nextPageLink
 				nextPageLink = ""
-				// haveImagePages := false
 				fmt.Printf("Handling page %s...", galleryPage)
 				err := OpenURL(galleryPage)
 				if err != nil {
@@ -159,7 +157,6 @@ func main() {
 				for _, link := range bow.Links() {
 					if strings.Contains(link.URL.Path, "/view/") {
 						newImagePages[link.URL.String()] = artist
-						// haveImagePages = true
 					}
 					if link.Text == "Next  ❯❯" {
 						url := link.URL.String()
