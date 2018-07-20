@@ -65,6 +65,7 @@ var rl = ratelimit.New(3, ratelimit.WithoutSlack)
 var bow = surf.NewBrowser()
 var jar *cookiejar.Jar
 var firstTenDigits = regexp.MustCompile(`^\d{10}`)
+var brokenFilename = regexp.MustCompile(`^\d{10}\.$`)
 
 func main() {
 	setupPprof()
@@ -188,6 +189,7 @@ func main() {
 			fmt.Printf("Got error while parsing URL %s: %v\n", imagePage, err)
 			continue
 		}
+		artist := imagePages[imagePage]
 		fmt.Printf("Handling image page %s...", URL.String())
 		// check if it's in db and skip if it is
 		{
@@ -227,6 +229,12 @@ func main() {
 
 		fmt.Printf(".")
 		filename := path.Base(image.Path)
+
+		// if it's "1234567890." (sometimes it happens), then append artist name
+		if m := brokenFilename.FindString(filename); len(m) != 0 {
+			filename = filename + artist + ".unnamedimage.jpg"
+		}
+
 		filepath := path.Join(opts.DownloadDirectory, filename)
 
 		// create download directory if needed
