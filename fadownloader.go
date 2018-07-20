@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +23,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"go.uber.org/ratelimit"
 	"vbom.ml/util/sortorder"
+
+	"net/http/pprof"
 )
 
 func isResponseOK(response *http.Response) bool {
@@ -64,6 +67,8 @@ var jar *cookiejar.Jar
 var firstTenDigits = regexp.MustCompile(`^\d{10}`)
 
 func main() {
+	setupPprof()
+	defer pprofListener.Close()
 	parser := flags.NewParser(&opts, flags.PrintErrors|flags.PassDoubleDash|flags.PassAfterNonOption)
 
 	// set custom usage line
@@ -419,3 +424,25 @@ func setDefaultConfigDirectory(parser *flags.Parser) error {
 }
 
 var last = time.Now()
+var pprofListener net.Listener
+
+func setupPprof() error {
+	var err error
+	pprofListener, err = net.Listen("tcp", "localhost:6053")
+	if err != nil {
+		fmt.Printf("Failed to start pprof handler: %s", err)
+		return err
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	go func() {
+		http.Serve(pprofListener, mux)
+	}()
+	return nil
+}
