@@ -109,6 +109,9 @@ func main() {
 	jar.Save()
 	defer jar.Save()
 
+	// don't keep unlimited history, we never use the feature anyway
+	bow.HistoryJar().SetMax(1)
+
 	fmt.Printf("Opening database...")
 	db, err := sqlite.OpenConn(path.Join(opts.ConfigDir, "downloaded.sqlite"), 0)
 	if err != nil {
