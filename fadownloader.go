@@ -211,22 +211,22 @@ func main() {
 			continue
 		}
 
-		image := ""
+		var image *url.URL
 
 		fmt.Printf(".")
 		for _, link := range bow.Links() {
 			if link.Text == "Download" {
-				image = link.URL.String()
+				image = link.URL
 			}
 		}
 
-		if image == "" {
+		if image == nil {
 			fmt.Printf("Page %s does not have image link -- skipping (page title is %s)\n", imagePage, bow.Title())
 			continue
 		}
 
 		fmt.Printf(".")
-		filename := path.Base(image)
+		filename := path.Base(image.Path)
 		filepath := path.Join(opts.DownloadDirectory, filename)
 
 		// create download directory if needed
@@ -265,7 +265,7 @@ func main() {
 
 			// request the image
 			fmt.Printf(".")
-			resp, err := http.Get(image)
+			resp, err := http.Get(image.String())
 			if resp != nil {
 				defer resp.Body.Close()
 			}
@@ -323,7 +323,7 @@ func DBMustExecute(db *sqlite.Conn, pragma string) {
 	}
 }
 
-func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image string, lastModified time.Time, filename string) error {
+func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
 	dbkey := URL.Path
 	err := sqliteutil.Exec(db, "INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified, filename) VALUES (?, ?, ?, ?)", nil, dbkey, image, lastModified, filename)
 	return err
