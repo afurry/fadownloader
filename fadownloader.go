@@ -245,32 +245,10 @@ func main() {
 			continue
 		}
 
-		// check if file exists
-		if _, err := os.Stat(filepath); err == nil {
-			lastModified := setimagetime(filepath)
-			fmt.Printf(" %s (already exists)\n", filename)
-			// save to database
-			err = DBSetImageURL(db, URL, image, lastModified, filename)
-			if err != nil {
-				fmt.Printf("Failed updating database: %s\n", err)
-				continue
-			}
-			continue
-		}
-
 		// smaller scope so that we can close the file right after we're done with it
 		var lastModified time.Time
 		var bytesWritten int64
 		{
-			// create temporary download file
-			fmt.Printf(".")
-			out, err := os.Create(filepath + ".download")
-			if err != nil {
-				fmt.Printf("Failed to create file '%s': %s\n", filepath, err)
-				continue
-			}
-			defer out.Close()
-
 			// request the image
 			fmt.Printf(".")
 			resp, err := http.Get(image.String())
@@ -281,6 +259,36 @@ func main() {
 				fmt.Printf("Failed to get URL '%s': %s\n", image, err)
 				continue
 			}
+
+			// check if file exists and filesize matches
+			fmt.Printf(".")
+			if stat, err := os.Stat(filepath); err == nil {
+				if imagesize, err := parseContentLength(resp.Header.Get("Content-Length")); err != nil {
+					fmt.Printf("failed parsing content-length, redownloading file anyway: %s\n", err)
+				} else {
+					if imagesize == stat.Size() {
+						// skip, file exists and size matches
+						lastModified := setimagetime(filepath)
+						fmt.Printf(" %s (already exists)\n", filename)
+						// save to database
+						err = DBSetImageURL(db, URL, image, lastModified, filename)
+						if err != nil {
+							fmt.Printf("Failed updating database: %s\n", err)
+							continue
+						}
+						continue
+					}
+				}
+			}
+
+			// create temporary download file
+			fmt.Printf(".")
+			out, err := os.Create(filepath + ".download")
+			if err != nil {
+				fmt.Printf("Failed to create file '%s': %s\n", filepath, err)
+				continue
+			}
+			defer out.Close()
 
 			// save the image
 			fmt.Printf(".")
@@ -324,6 +332,22 @@ func main() {
 // ----------------
 // helper functions
 // ----------------
+
+// parseContentLength trims whitespace from s and returns -1 if no value
+// is set, or the value if it's >= 0.
+func parseContentLength(cl string) (int64, error) {
+	cl = strings.TrimSpace(cl)
+	if cl == "" {
+		return -1, nil
+	}
+	n, err := strconv.ParseInt(cl, 10, 64)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("Bad Content-Length: \"%s\"", cl)
+	}
+	return n, nil
+
+}
+
 func DBMustExecute(db *sqlite.Conn, pragma string) {
 	err := sqliteutil.ExecTransient(db, pragma, nil)
 	if err != nil {
