@@ -118,7 +118,7 @@ func main() {
 		panic(err)
 	}
 	defer db.Close()
-	DBMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT)")
+	DBMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT, filename TEXT)")
 	DBMustExecute(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)")
 	DBMustExecute(db, "PRAGMA cache_size = 1000000")
 	DBMustExecute(db, "PRAGMA temp_store = MEMORY")
@@ -192,18 +192,16 @@ func main() {
 		// check if it's in db and skip if it is
 		{
 			dbkey := URL.Path
-			var imageurl string
-			var last_modified string
+			var filename string
 			fn := func(stmt *sqlite.Stmt) error {
-				imageurl = stmt.ColumnText(0)
-				last_modified = stmt.ColumnText(1)
+				filename = stmt.ColumnText(0)
 				return nil
 			}
-			err := sqliteutil.Exec(db, "SELECT image_url, last_modified FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
+			err := sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
 			if err != nil {
 				fmt.Printf("Failed querying database, will download anyway: %s\n", err)
-			} else if imageurl != "" {
-				fmt.Printf(" %s (already in database)\n", path.Base(imageurl))
+			} else if filename != "" {
+				fmt.Printf(" %s (already in database)\n", filename)
 				continue
 			}
 		}
@@ -244,7 +242,7 @@ func main() {
 			lastModified := setimagetime(filepath)
 			fmt.Printf(" %s (already exists)\n", filename)
 			// save to database
-			err = DBSetImageURL(db, URL, image, lastModified)
+			err = DBSetImageURL(db, URL, image, lastModified, filename)
 			if err != nil {
 				fmt.Printf("Failed updating database: %s\n", err)
 				continue
@@ -306,7 +304,7 @@ func main() {
 
 		// save to database
 		fmt.Printf(".")
-		err = DBSetImageURL(db, URL, image, lastModified)
+		err = DBSetImageURL(db, URL, image, lastModified, filename)
 		if err != nil {
 			fmt.Printf("Failed updating database: %s\n", err)
 			continue
@@ -325,9 +323,9 @@ func DBMustExecute(db *sqlite.Conn, pragma string) {
 	}
 }
 
-func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image string, lastModified time.Time) error {
+func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image string, lastModified time.Time, filename string) error {
 	dbkey := URL.Path
-	err := sqliteutil.Exec(db, "INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified) VALUES (?, ?, ?)", nil, dbkey, image, lastModified)
+	err := sqliteutil.Exec(db, "INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified, filename) VALUES (?, ?, ?, ?)", nil, dbkey, image, lastModified, filename)
 	return err
 }
 func setimagetime(filepath string) time.Time {
