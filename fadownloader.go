@@ -115,36 +115,13 @@ func main() {
 		panic(err)
 	}
 	defer db.Close()
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT)", nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)", nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "PRAGMA cache_size = 1000000", nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "PRAGMA temp_store = MEMORY", nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "PRAGMA synchronous = OFF", nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf(".")
-	err = sqliteutil.ExecTransient(db, "PRAGMA journal_mode = MEMORY", nil)
-	if err != nil {
-		panic(err)
-	}
+	DBMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT)")
+	DBMustExecute(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)")
+	DBMustExecute(db, "PRAGMA cache_size = 1000000")
+	DBMustExecute(db, "PRAGMA temp_store = MEMORY")
+	DBMustExecute(db, "PRAGMA synchronous = OFF")
+	DBMustExecute(db, "PRAGMA journal_mode = MEMORY")
+	DBMustExecute(db, "PRAGMA busy_timeout = 5000")
 	fmt.Printf("\n")
 
 	imagePages := map[string]string{}
@@ -341,6 +318,13 @@ func main() {
 // ----------------
 // helper functions
 // ----------------
+func DBMustExecute(db *sqlite.Conn, pragma string) {
+	err := sqliteutil.ExecTransient(db, pragma, nil)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to execute statement %s: %s", pragma, err))
+	}
+}
+
 func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image string, lastModified time.Time) error {
 	dbkey := URL.Path
 	err := sqliteutil.Exec(db, "INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified) VALUES (?, ?, ?)", nil, dbkey, image, lastModified)
