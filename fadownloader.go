@@ -79,7 +79,7 @@ func main() {
 	updateDefaults(parser)
 
 	// parse command line options
-	args, err := parser.Parse()
+	artists, err := parser.Parse()
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +131,8 @@ func main() {
 
 	imagePages := map[string]string{}
 
-	for _, artist := range args {
+	sort.Sort(sortorder.Natural(artists))
+	for _, artist := range artists {
 		fmt.Printf("Handling artist %s...\n", artist)
 		pageTypes := []string{}
 		if !opts.NoGrabGallery {
