@@ -133,8 +133,8 @@ func main() {
 	imagePages := map[string]string{}
 
 	sort.Sort(sortorder.Natural(artists))
-	for _, artist := range artists {
-		fmt.Printf("Handling artist %s...\n", artist)
+	for i, artist := range artists {
+		fmt.Printf("Scanning artist %s (#%d of %d) for links...\n", artist, i, len(artists))
 		pageTypes := []string{}
 		if !opts.NoGrabGallery {
 			pageTypes = append(pageTypes, "gallery")
@@ -149,10 +149,12 @@ func main() {
 		for _, pageType := range pageTypes {
 			startPage := fmt.Sprintf("https://www.furaffinity.net/%s/%s/", pageType, artist)
 			nextPageLink := startPage
+			counter := 0
 			for nextPageLink != "" {
+				counter++
 				galleryPage := nextPageLink
 				nextPageLink = ""
-				fmt.Printf("Handling page %s...", galleryPage)
+				fmt.Printf("Going to %s's %s page #%d...", artist, pageType, counter)
 				err := openURL(galleryPage)
 				if err != nil {
 					fmt.Printf("Got error while getting %s: %v\n", galleryPage, err)
@@ -195,6 +197,8 @@ func main() {
 
 	sort.Sort(sortorder.Natural(keys))
 
+	fmt.Printf("Will get total %d pictures\n", len(keys))
+
 	var wg sync.WaitGroup
 	for counter, imagePage := range keys {
 		length := len(keys)
@@ -204,19 +208,19 @@ func main() {
 			continue
 		}
 		artist := imagePages[imagePage]
-		fmt.Printf("Queueing %s (#%d of %d)...\n", URL.Path, counter, len(keys))
+		fmt.Printf("[#%6d of %6d] Queuing %s\n", counter, length, URL.Path)
 		// check if it's in db and skip if it is
 		isDownloaded, err := dbCheckIfDownloaded(db, URL)
 		if err != nil {
-			fmt.Printf("Failed querying database, will download anyway: %s\n", err)
+			fmt.Printf("[#%6d of %6d] Failed querying database, will download anyway: %s\n", counter, length, err)
 		}
 		if isDownloaded {
-			fmt.Printf("Skipped (already in database)\n")
+			fmt.Printf("[#%6d of %6d] Skipped (already in database)\n", counter, length)
 			continue
 		}
 		err = openURL(imagePage)
 		if err != nil {
-			fmt.Printf("Got error while getting %s: %v\n", imagePage, err)
+			fmt.Printf("[#%6d of %6d] Got error while getting %s: %v\n", counter, length, imagePage, err)
 			continue
 		}
 
@@ -229,7 +233,7 @@ func main() {
 		}
 
 		if image == nil {
-			fmt.Printf("Page %s does not have image link -- skipping (page title is %s)\n", imagePage, bow.Title())
+			fmt.Printf("[#%6d of %6d] Page %s does not have image link -- skipping (page title is %s)\n", counter, length, imagePage, bow.Title())
 			continue
 		}
 
@@ -248,7 +252,7 @@ func main() {
 			// create download directory if needed
 			err := os.MkdirAll(opts.DownloadDirectory, 0700)
 			if err != nil {
-				fmt.Printf("Couldn't create download directory %s: %s\n", opts.DownloadDirectory, err)
+				fmt.Printf("[#%6d of %6d] Couldn't create download directory %s: %s\n", counter, length, opts.DownloadDirectory, err)
 				return
 			}
 
@@ -262,7 +266,7 @@ func main() {
 			req.SetRequestURI(image.String())
 			err = fasthttp.Do(req, resp)
 			if err != nil {
-				fmt.Printf("Failed to get URL '%s': %s\n", image, err)
+				fmt.Printf("[#%6d of %6d] Failed to get URL '%s': %s\n", counter, length, image.String(), err)
 				return
 			}
 
@@ -272,11 +276,11 @@ func main() {
 				if int64(resp.Header.ContentLength()) == stat.Size() {
 					// skip, file exists and size matches
 					lastModified = setimagetime(filepath)
-					fmt.Printf("Skipped %s (already exists)\n", filename)
+					fmt.Printf("[#%6d of %6d] Skipped %s (already exists)\n", counter, length, filename)
 					// save to database
 					err = dbSetImageURL(dbpool, URL, image, lastModified, filename)
 					if err != nil {
-						fmt.Printf("Failed updating database: %s\n", err)
+						fmt.Printf("[#%6d of %6d] Failed updating database: %s\n", counter, length, err)
 						return
 					}
 					return
@@ -286,7 +290,7 @@ func main() {
 			// create temporary download file
 			out, err := os.Create(filepath + ".download")
 			if err != nil {
-				fmt.Printf("Failed to create file '%s': %s\n", filepath, err)
+				fmt.Printf("[#%6d of %6d] Failed to create file '%s': %s\n", counter, length, filepath, err)
 				return
 			}
 			defer out.Close()
@@ -294,7 +298,7 @@ func main() {
 			// save the image
 			err = resp.BodyWriteTo(out)
 			if err != nil {
-				fmt.Printf("Failed to download URL '%s': %s\n", image, err)
+				fmt.Printf("[#%6d of %6d] Failed to download URL '%s': %s\n", counter, length, image.String(), err)
 				return
 			}
 
@@ -303,7 +307,7 @@ func main() {
 			if len(lastmod) != 0 {
 				lastModified, err = fasthttp.ParseHTTPDate(lastmod)
 				if err != nil {
-					fmt.Printf("Failed to parse lastModified from %s, ignoring lastmodified: %s\n", string(lastmod), err)
+					fmt.Printf("[#%6d of %6d] Failed to parse lastModified from %s, ignoring lastmodified: %s\n", counter, length, string(lastmod), err)
 					return
 				}
 			}
@@ -311,7 +315,7 @@ func main() {
 			// rename temporary file to proper name
 			err = os.Rename(filepath+".download", filepath)
 			if err != nil {
-				fmt.Printf("Failed to rename %s to %s: %s\n", filename+".download", filename, err)
+				fmt.Printf("[#%6d of %6d] Failed to rename %s to %s: %s\n", counter, length, filename+".download", filename, err)
 				return
 			}
 
@@ -321,10 +325,10 @@ func main() {
 			// save to database
 			err = dbSetImageURL(dbpool, URL, image, lastModified, filename)
 			if err != nil {
-				fmt.Printf("Failed updating database: %s\n", err)
+				fmt.Printf("[#%6d of %6d] Failed updating database: %s\n", counter, length, err)
 				return
 			}
-			fmt.Printf("Saved %s (%v bytes)\n", filename, resp.Header.ContentLength())
+			fmt.Printf("[#%6d of %6d] Saved %s (%v bytes)\n", counter, length, filename, resp.Header.ContentLength())
 		}(*image, artist, dbpool, *URL, counter, length, &wg)
 	}
 	wg.Wait()
