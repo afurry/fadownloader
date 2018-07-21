@@ -53,6 +53,7 @@ func openURL(URL string) error {
 }
 
 var opts struct {
+	NoFastScan        bool   `long:"no-fast-scan" description:"Disable fast scanning for artist's images"`
 	NoGrabGallery     bool   `short:"g" long:"no-grab-gallery" description:"Don't grab artist's gallery"`
 	GrabFavourites    bool   `short:"f" long:"grab-favourites" description:"Grab artist's favourites"`
 	GrabScraps        bool   `short:"s" long:"grab-scraps" description:"Grab artist's scraps"`
@@ -159,19 +160,28 @@ func main() {
 				}
 
 				fmt.Printf(".")
-				newImagePages := map[string]string{}
+				newImagePages := map[*url.URL]string{}
 				for _, link := range bow.Links() {
 					if strings.Contains(link.URL.Path, "/view/") {
-						newImagePages[link.URL.String()] = artist
+						newImagePages[link.URL] = artist
 					}
 					if link.Text == "Next  ❯❯" {
 						url := link.URL.String()
 						nextPageLink = url
 					}
 				}
-				fmt.Printf(" Got %d images\n", len(newImagePages))
+				newImageCount := 0
 				for k, v := range newImagePages {
-					imagePages[k] = v
+					// if already downloaded, don't add it
+					isDownloaded, _ := dbCheckIfDownloaded(db, k)
+					if !isDownloaded {
+						imagePages[k.String()] = v
+						newImageCount++
+					}
+				}
+				fmt.Printf(" Got %d valid and %d new images\n", len(newImagePages), newImageCount)
+				if !opts.NoFastScan && newImageCount == 0 {
+					break
 				}
 			}
 		}
