@@ -246,7 +246,7 @@ func main() {
 			filepath := path.Join(opts.DownloadDirectory, filename)
 
 			// create download directory if needed
-			err = os.MkdirAll(opts.DownloadDirectory, 0700)
+			err := os.MkdirAll(opts.DownloadDirectory, 0700)
 			if err != nil {
 				fmt.Printf("Couldn't create download directory %s: %s\n", opts.DownloadDirectory, err)
 				return
@@ -260,7 +260,7 @@ func main() {
 			defer fasthttp.ReleaseRequest(req)
 			defer fasthttp.ReleaseResponse(resp)
 			req.SetRequestURI(image.String())
-			err := fasthttp.Do(req, resp)
+			err = fasthttp.Do(req, resp)
 			if err != nil {
 				fmt.Printf("Failed to get URL '%s': %s\n", image, err)
 				return
