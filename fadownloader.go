@@ -38,7 +38,6 @@ func isResponseOK(response *http.Response) bool {
 
 func OpenURL(URL string) error {
 	now := rl.Take()
-	fmt.Printf("%.2fms", now.Sub(last).Seconds()*1000.0)
 	last = now
 
 	err := bow.Open(URL)
@@ -114,11 +113,12 @@ func main() {
 	bow.HistoryJar().SetMax(1)
 
 	fmt.Printf("Opening database...")
-	db, err := sqlite.OpenConn(path.Join(opts.ConfigDir, "downloaded.sqlite"), 0)
+	dbpool, err := sqlite.Open(path.Join(opts.ConfigDir, "downloaded.sqlite"), 0, 100)
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+	defer dbpool.Close()
+	db := dbpool.Get(nil)
 	DBMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT, filename TEXT)")
 	DBMustExecute(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)")
 	DBMustExecute(db, "PRAGMA cache_size = 1000000")
@@ -126,6 +126,7 @@ func main() {
 	DBMustExecute(db, "PRAGMA synchronous = OFF")
 	DBMustExecute(db, "PRAGMA journal_mode = MEMORY")
 	DBMustExecute(db, "PRAGMA busy_timeout = 5000")
+	defer dbpool.Put(db)
 	fmt.Printf("\n")
 
 	imagePages := map[string]string{}
@@ -183,14 +184,16 @@ func main() {
 
 	sort.Sort(sortorder.Natural(keys))
 
+	counter := 0
 	for _, imagePage := range keys {
+		counter++
 		URL, err := url.Parse(imagePage)
 		if err != nil {
 			fmt.Printf("Got error while parsing URL %s: %v\n", imagePage, err)
 			continue
 		}
 		artist := imagePages[imagePage]
-		fmt.Printf("Handling image page %s...", URL.String())
+		fmt.Printf("Queueing %s (#%d of %d)...\n", URL.Path, counter, len(keys))
 		// check if it's in db and skip if it is
 		{
 			dbkey := URL.Path
@@ -203,7 +206,7 @@ func main() {
 			if err != nil {
 				fmt.Printf("Failed querying database, will download anyway: %s\n", err)
 			} else if filename != "" {
-				fmt.Printf(" %s (already in database)\n", filename)
+				fmt.Printf("Skipped %s (already in database)\n", filename)
 				continue
 			}
 		}
@@ -215,7 +218,6 @@ func main() {
 
 		var image *url.URL
 
-		fmt.Printf(".")
 		for _, link := range bow.Links() {
 			if link.Text == "Download" {
 				image = link.URL
@@ -227,30 +229,27 @@ func main() {
 			continue
 		}
 
-		fmt.Printf(".")
-		filename := path.Base(image.Path)
+		go func() {
+			filename := path.Base(image.Path)
 
-		// if it's "1234567890." (sometimes it happens), then append artist name
-		if m := brokenFilename.FindString(filename); len(m) != 0 {
-			filename = filename + artist + ".unnamedimage.jpg"
-		}
+			// if it's "1234567890." (sometimes it happens), then append artist name
+			if m := brokenFilename.FindString(filename); len(m) != 0 {
+				filename = filename + artist + ".unnamedimage.jpg"
+			}
 
-		filepath := path.Join(opts.DownloadDirectory, filename)
+			filepath := path.Join(opts.DownloadDirectory, filename)
 
-		// create download directory if needed
-		fmt.Printf(".")
-		err = os.MkdirAll(opts.DownloadDirectory, 0777)
-		if err != nil {
-			fmt.Printf("Couldn't create download directory %s: %s\n", opts.DownloadDirectory, err)
-			continue
-		}
+			// create download directory if needed
+			err = os.MkdirAll(opts.DownloadDirectory, 0777)
+			if err != nil {
+				fmt.Printf("Couldn't create download directory %s: %s\n", opts.DownloadDirectory, err)
+				return
+			}
 
-		// smaller scope so that we can close the file right after we're done with it
-		var lastModified time.Time
-		var bytesWritten int64
-		{
+			// smaller scope so that we can close the file right after we're done with it
+			var lastModified time.Time
+			var bytesWritten int64
 			// request the image
-			fmt.Printf(".")
 			req := fasthttp.AcquireRequest()
 			resp := fasthttp.AcquireResponse()
 			defer fasthttp.ReleaseRequest(req)
@@ -259,75 +258,68 @@ func main() {
 			err := fasthttp.Do(req, resp)
 			if err != nil {
 				fmt.Printf("Failed to get URL '%s': %s\n", image, err)
-				continue
+				return
 			}
 
 			// check if file exists and filesize matches
-			fmt.Printf(".")
 			if stat, err := os.Stat(filepath); err == nil {
 				if int64(resp.Header.ContentLength()) == stat.Size() {
 					// skip, file exists and size matches
 					lastModified := setimagetime(filepath)
-					fmt.Printf(" %s (already exists)\n", filename)
+					fmt.Printf("Skipped %s (already exists)\n", filename)
 					// save to database
-					err = DBSetImageURL(db, URL, image, lastModified, filename)
+					err = DBSetImageURL(dbpool, URL, image, lastModified, filename)
 					if err != nil {
 						fmt.Printf("Failed updating database: %s\n", err)
-						continue
+						return
 					}
-					continue
+					return
 				}
 			}
 
 			// create temporary download file
-			fmt.Printf(".")
 			out, err := os.Create(filepath + ".download")
 			if err != nil {
 				fmt.Printf("Failed to create file '%s': %s\n", filepath, err)
-				continue
+				return
 			}
 			defer out.Close()
 
 			// save the image
-			fmt.Printf(".")
 			err = resp.BodyWriteTo(out)
 			if err != nil {
 				fmt.Printf("Failed to download URL '%s': %s\n", image, err)
-				continue
+				return
 			}
 
 			// get last-modified
-			fmt.Printf(".")
 			lastmod := resp.Header.Peek("Last-Modified")
 			if len(lastmod) != 0 {
 				lastModified, err = fasthttp.ParseHTTPDate(lastmod)
 				if err != nil {
 					fmt.Printf("Failed to parse lastModified from %s, ignoring lastmodified: %s\n", string(lastmod), err)
-					continue
+					return
 				}
 			}
-		}
 
-		// rename temporary file to proper name
-		fmt.Printf(".")
-		err = os.Rename(filepath+".download", filepath)
-		if err != nil {
-			fmt.Printf("Failed to rename %s to %s: %s\n", filename+".download", filename, err)
-			continue
-		}
+			// rename temporary file to proper name
+			err = os.Rename(filepath+".download", filepath)
+			if err != nil {
+				fmt.Printf("Failed to rename %s to %s: %s\n", filename+".download", filename, err)
+				return
+			}
 
-		// set file's time
-		fmt.Printf(".")
-		setimagetime(filepath)
+			// set file's time
+			setimagetime(filepath)
 
-		// save to database
-		fmt.Printf(".")
-		err = DBSetImageURL(db, URL, image, lastModified, filename)
-		if err != nil {
-			fmt.Printf("Failed updating database: %s\n", err)
-			continue
-		}
-		fmt.Printf(" %s (%v bytes)\n", filename, bytesWritten)
+			// save to database
+			err = DBSetImageURL(dbpool, URL, image, lastModified, filename)
+			if err != nil {
+				fmt.Printf("Failed updating database: %s\n", err)
+				return
+			}
+			fmt.Printf("Saved %s (%v bytes)\n", filename, bytesWritten)
+		}()
 	}
 }
 
@@ -357,10 +349,31 @@ func DBMustExecute(db *sqlite.Conn, pragma string) {
 	}
 }
 
-func DBSetImageURL(db *sqlite.Conn, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
+func DBSetImageURL(dbpool *sqlite.Pool, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
+	db := dbpool.Get(nil)
+	if db == nil {
+		return fmt.Errorf("Couldn't get db from dbpool")
+	}
+	defer dbpool.Put(db)
 	dbkey := URL.Path
-	err := sqliteutil.Exec(db, "INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified, filename) VALUES (?, ?, ?, ?)", nil, dbkey, image, lastModified, filename)
-	return err
+	stmt, err := db.Prepare("INSERT OR REPLACE INTO image_urls (page_url, image_url, last_modified, filename) VALUES ($page_url, $image_url, $last_modified, $filename)")
+	if err != nil {
+		fmt.Printf("Couldn't prepare SQL query for setting image url: %s\n", err)
+		return err
+	}
+	stmt.SetText("$page_url", dbkey)
+	stmt.SetText("$image_url", image.String())
+	stmt.SetText("$last_modified", lastModified.String())
+	stmt.SetText("$filename", filename)
+	for {
+		if hasRow, err := stmt.Step(); err != nil {
+			fmt.Printf("Couldn't execute SQL query for setting image url: %s\n", err)
+			return err
+		} else if !hasRow {
+			break
+		}
+	}
+	return nil
 }
 func setimagetime(filepath string) time.Time {
 	var t time.Time
