@@ -196,20 +196,13 @@ func main() {
 		artist := imagePages[imagePage]
 		fmt.Printf("Queueing %s (#%d of %d)...\n", URL.Path, counter, len(keys))
 		// check if it's in db and skip if it is
-		{
-			dbkey := URL.Path
-			var filename string
-			fn := func(stmt *sqlite.Stmt) error {
-				filename = stmt.ColumnText(0)
-				return nil
-			}
-			err = sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
-			if err != nil {
-				fmt.Printf("Failed querying database, will download anyway: %s\n", err)
-			} else if filename != "" {
-				fmt.Printf("Skipped %s (already in database)\n", filename)
-				continue
-			}
+		isDownloaded, err := dbCheckIfDownloaded(db, URL)
+		if err != nil {
+			fmt.Printf("Failed querying database, will download anyway: %s\n", err)
+		}
+		if isDownloaded {
+			fmt.Printf("Skipped (already in database)\n")
+			continue
 		}
 		err = openURL(imagePage)
 		if err != nil {
@@ -331,6 +324,23 @@ func main() {
 // ----------------
 // helper functions
 // ----------------
+
+// check if it's in db and skip if it is
+func dbCheckIfDownloaded(db *sqlite.Conn, URL *url.URL) (bool, error) {
+	dbkey := URL.Path
+	var filename string
+	fn := func(stmt *sqlite.Stmt) error {
+		filename = stmt.ColumnText(0)
+		return nil
+	}
+	err := sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
+	if err != nil {
+		return false, err
+	} else if filename != "" {
+		return true, nil
+	}
+	return false, nil
+}
 
 func dbMustExecute(db *sqlite.Conn, pragma string) {
 	err := sqliteutil.ExecTransient(db, pragma, nil)
