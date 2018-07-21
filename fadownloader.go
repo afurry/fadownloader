@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +20,7 @@ import (
 	"github.com/juju/persistent-cookiejar"
 	"github.com/kirsle/configdir"
 	"github.com/mitchellh/go-homedir"
+	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
 	"vbom.ml/util/sortorder"
 
@@ -251,10 +251,12 @@ func main() {
 		{
 			// request the image
 			fmt.Printf(".")
-			resp, err := http.Get(image.String())
-			if resp != nil {
-				defer resp.Body.Close()
-			}
+			req := fasthttp.AcquireRequest()
+			resp := fasthttp.AcquireResponse()
+			defer fasthttp.ReleaseRequest(req)
+			defer fasthttp.ReleaseResponse(resp)
+			req.SetRequestURI(image.String())
+			err := fasthttp.Do(req, resp)
 			if err != nil {
 				fmt.Printf("Failed to get URL '%s': %s\n", image, err)
 				continue
@@ -263,21 +265,17 @@ func main() {
 			// check if file exists and filesize matches
 			fmt.Printf(".")
 			if stat, err := os.Stat(filepath); err == nil {
-				if imagesize, err := parseContentLength(resp.Header.Get("Content-Length")); err != nil {
-					fmt.Printf("failed parsing content-length, redownloading file anyway: %s\n", err)
-				} else {
-					if imagesize == stat.Size() {
-						// skip, file exists and size matches
-						lastModified := setimagetime(filepath)
-						fmt.Printf(" %s (already exists)\n", filename)
-						// save to database
-						err = DBSetImageURL(db, URL, image, lastModified, filename)
-						if err != nil {
-							fmt.Printf("Failed updating database: %s\n", err)
-							continue
-						}
+				if int64(resp.Header.ContentLength()) == stat.Size() {
+					// skip, file exists and size matches
+					lastModified := setimagetime(filepath)
+					fmt.Printf(" %s (already exists)\n", filename)
+					// save to database
+					err = DBSetImageURL(db, URL, image, lastModified, filename)
+					if err != nil {
+						fmt.Printf("Failed updating database: %s\n", err)
 						continue
 					}
+					continue
 				}
 			}
 
@@ -292,7 +290,7 @@ func main() {
 
 			// save the image
 			fmt.Printf(".")
-			bytesWritten, err = io.Copy(out, resp.Body)
+			err = resp.BodyWriteTo(out)
 			if err != nil {
 				fmt.Printf("Failed to download URL '%s': %s\n", image, err)
 				continue
@@ -300,9 +298,13 @@ func main() {
 
 			// get last-modified
 			fmt.Printf(".")
-			lastmod := resp.Header.Get("Last-Modified")
-			if lastmod != "" {
-				lastModified, err = http.ParseTime(lastmod)
+			lastmod := resp.Header.Peek("Last-Modified")
+			if len(lastmod) != 0 {
+				lastModified, err = fasthttp.ParseHTTPDate(lastmod)
+				if err != nil {
+					fmt.Printf("Failed to parse lastModified from %s, ignoring lastmodified: %s\n", string(lastmod), err)
+					continue
+				}
 			}
 		}
 
