@@ -36,7 +36,7 @@ func isResponseOK(response *http.Response) bool {
 	return false
 }
 
-func OpenURL(URL string) error {
+func openURL(URL string) error {
 	now := rl.Take()
 	last = now
 
@@ -55,9 +55,9 @@ var opts struct {
 	NoGrabGallery     bool   `short:"g" long:"no-grab-gallery" description:"Don't grab artist's gallery"`
 	GrabFavourites    bool   `short:"f" long:"grab-favourites" description:"Grab artist's favourites"`
 	GrabScraps        bool   `short:"s" long:"grab-scraps" description:"Grab artist's scraps"`
+	Help              bool   `short:"h" long:"help" description:"Display this help message"`
 	ConfigDir         string `short:"c" long:"config-directory" description:"Specify config directory" value-name:"dir"`
 	DownloadDirectory string `short:"d" long:"download-directory" description:"Specify download directory" value-name:"dir" default:"~/Pictures/FADownloader"`
-	Help              bool   `short:"h" long:"help" description:"Display this help message"`
 }
 
 var rl = ratelimit.New(3, ratelimit.WithoutSlack)
@@ -94,7 +94,6 @@ func main() {
 
 	fmt.Printf("Setting cookiejar\n")
 	{
-		var err error
 		cookiepath := path.Join(opts.ConfigDir, "cookies.json")
 		fmt.Printf("cookie path - %s\n", cookiepath)
 		jar, err = cookiejar.New(&cookiejar.Options{
@@ -105,8 +104,11 @@ func main() {
 		}
 		bow.SetCookieJar(jar)
 		bow.SetUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.28.10 (KHTML, like Gecko) Version/6.0.3 Safari/536.28.10")
+		err = jar.Save()
+		if err != nil {
+			panic(err)
+		}
 	}
-	jar.Save()
 	defer jar.Save()
 
 	// don't keep unlimited history, we never use the feature anyway
@@ -119,13 +121,13 @@ func main() {
 	}
 	defer dbpool.Close()
 	db := dbpool.Get(nil)
-	DBMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT, filename TEXT)")
-	DBMustExecute(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)")
-	DBMustExecute(db, "PRAGMA cache_size = 1000000")
-	DBMustExecute(db, "PRAGMA temp_store = MEMORY")
-	DBMustExecute(db, "PRAGMA synchronous = OFF")
-	DBMustExecute(db, "PRAGMA journal_mode = MEMORY")
-	DBMustExecute(db, "PRAGMA busy_timeout = 5000")
+	dbMustExecute(db, "CREATE TABLE IF NOT EXISTS image_urls (page_url TEXT PRIMARY KEY UNIQUE, image_url TEXT, last_modified TEXT, filename TEXT)")
+	dbMustExecute(db, "CREATE INDEX IF NOT EXISTS page_urls ON image_urls(page_url)")
+	dbMustExecute(db, "PRAGMA cache_size = 1000000")
+	dbMustExecute(db, "PRAGMA temp_store = MEMORY")
+	dbMustExecute(db, "PRAGMA synchronous = OFF")
+	dbMustExecute(db, "PRAGMA journal_mode = MEMORY")
+	dbMustExecute(db, "PRAGMA busy_timeout = 5000")
 	defer dbpool.Put(db)
 	fmt.Printf("\n")
 
@@ -151,7 +153,7 @@ func main() {
 				galleryPage := nextPageLink
 				nextPageLink = ""
 				fmt.Printf("Handling page %s...", galleryPage)
-				err := OpenURL(galleryPage)
+				err := openURL(galleryPage)
 				if err != nil {
 					fmt.Printf("Got error while getting %s: %v\n", galleryPage, err)
 					continue
@@ -202,7 +204,7 @@ func main() {
 				filename = stmt.ColumnText(0)
 				return nil
 			}
-			err := sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
+			err = sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
 			if err != nil {
 				fmt.Printf("Failed querying database, will download anyway: %s\n", err)
 			} else if filename != "" {
@@ -210,7 +212,7 @@ func main() {
 				continue
 			}
 		}
-		err = OpenURL(imagePage)
+		err = openURL(imagePage)
 		if err != nil {
 			fmt.Printf("Got error while getting %s: %v\n", imagePage, err)
 			continue
@@ -240,7 +242,7 @@ func main() {
 			filepath := path.Join(opts.DownloadDirectory, filename)
 
 			// create download directory if needed
-			err = os.MkdirAll(opts.DownloadDirectory, 0777)
+			err = os.MkdirAll(opts.DownloadDirectory, 0700)
 			if err != nil {
 				fmt.Printf("Couldn't create download directory %s: %s\n", opts.DownloadDirectory, err)
 				return
@@ -262,13 +264,14 @@ func main() {
 			}
 
 			// check if file exists and filesize matches
-			if stat, err := os.Stat(filepath); err == nil {
+			var stat os.FileInfo
+			if stat, err = os.Stat(filepath); err == nil {
 				if int64(resp.Header.ContentLength()) == stat.Size() {
 					// skip, file exists and size matches
-					lastModified := setimagetime(filepath)
+					lastModified = setimagetime(filepath)
 					fmt.Printf("Skipped %s (already exists)\n", filename)
 					// save to database
-					err = DBSetImageURL(dbpool, URL, image, lastModified, filename)
+					err = dbSetImageURL(dbpool, URL, image, lastModified, filename)
 					if err != nil {
 						fmt.Printf("Failed updating database: %s\n", err)
 						return
@@ -313,7 +316,7 @@ func main() {
 			setimagetime(filepath)
 
 			// save to database
-			err = DBSetImageURL(dbpool, URL, image, lastModified, filename)
+			err = dbSetImageURL(dbpool, URL, image, lastModified, filename)
 			if err != nil {
 				fmt.Printf("Failed updating database: %s\n", err)
 				return
@@ -327,29 +330,14 @@ func main() {
 // helper functions
 // ----------------
 
-// parseContentLength trims whitespace from s and returns -1 if no value
-// is set, or the value if it's >= 0.
-func parseContentLength(cl string) (int64, error) {
-	cl = strings.TrimSpace(cl)
-	if cl == "" {
-		return -1, nil
-	}
-	n, err := strconv.ParseInt(cl, 10, 64)
-	if err != nil || n < 0 {
-		return 0, fmt.Errorf("Bad Content-Length: \"%s\"", cl)
-	}
-	return n, nil
-
-}
-
-func DBMustExecute(db *sqlite.Conn, pragma string) {
+func dbMustExecute(db *sqlite.Conn, pragma string) {
 	err := sqliteutil.ExecTransient(db, pragma, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to execute statement %s: %s", pragma, err))
 	}
 }
 
-func DBSetImageURL(dbpool *sqlite.Pool, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
+func dbSetImageURL(dbpool *sqlite.Pool, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
 	db := dbpool.Get(nil)
 	if db == nil {
 		return fmt.Errorf("Couldn't get db from dbpool")
@@ -412,10 +400,7 @@ func updateDefaults(parser *flags.Parser) error {
 	}
 	// set config directory to platform standard
 	err = setDefaultConfigDirectory(parser)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func expandDefaultDownloadDirectory(parser *flags.Parser) error {
