@@ -254,7 +254,6 @@ func main() {
 
 			// smaller scope so that we can close the file right after we're done with it
 			var lastModified time.Time
-			var bytesWritten int64
 			// request the image
 			req := fasthttp.AcquireRequest()
 			resp := fasthttp.AcquireResponse()
@@ -325,7 +324,7 @@ func main() {
 				fmt.Printf("Failed updating database: %s\n", err)
 				return
 			}
-			fmt.Printf("Saved %s (%v bytes)\n", filename, bytesWritten)
+			fmt.Printf("Saved %s (%v bytes)\n", filename, resp.Header.ContentLength())
 		}(*image, artist, dbpool, *URL, counter, length, &wg)
 	}
 	wg.Wait()
