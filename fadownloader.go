@@ -196,9 +196,8 @@ func main() {
 	sort.Sort(sortorder.Natural(keys))
 
 	var wg sync.WaitGroup
-	counter := 0
-	for _, imagePage := range keys {
-		counter++
+	for counter, imagePage := range keys {
+		length := len(keys)
 		URL, err := url.Parse(imagePage)
 		if err != nil {
 			fmt.Printf("Got error while parsing URL %s: %v\n", imagePage, err)
@@ -327,7 +326,7 @@ func main() {
 				return
 			}
 			fmt.Printf("Saved %s (%v bytes)\n", filename, bytesWritten)
-		}(*image, artist, dbpool, *URL, counter, len(keys), &wg)
+		}(*image, artist, dbpool, *URL, counter, length, &wg)
 	}
 	wg.Wait()
 }
