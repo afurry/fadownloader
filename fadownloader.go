@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"crawshaw.io/sqlite"
@@ -183,6 +184,7 @@ func main() {
 
 	sort.Sort(sortorder.Natural(keys))
 
+	var wg sync.WaitGroup
 	counter := 0
 	for _, imagePage := range keys {
 		counter++
@@ -228,7 +230,9 @@ func main() {
 			continue
 		}
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			filename := path.Base(image.Path)
 
 			// if it's "1234567890." (sometimes it happens), then append artist name
@@ -321,6 +325,7 @@ func main() {
 			fmt.Printf("Saved %s (%v bytes)\n", filename, bytesWritten)
 		}()
 	}
+	wg.Wait()
 }
 
 // ----------------
