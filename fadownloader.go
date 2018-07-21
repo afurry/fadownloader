@@ -75,10 +75,7 @@ func main() {
 	parser.Usage = "[options] artist1 [artist2 ...]"
 
 	// update parser defaults with platform/user specific values
-	err := updateDefaults(parser)
-	if err != nil {
-		panic(err)
-	}
+	updateDefaults(parser)
 
 	// parse command line options
 	args, err := parser.Parse()
@@ -392,36 +389,31 @@ func setimagetime(filepath string) time.Time {
 	return t
 }
 
-func updateDefaults(parser *flags.Parser) error {
+func updateDefaults(parser *flags.Parser) {
 	// expand ~ into home directory
-	err := expandDefaultDownloadDirectory(parser)
-	if err != nil {
-		return err
-	}
+	expandDefaultDownloadDirectory(parser)
 	// set config directory to platform standard
-	err = setDefaultConfigDirectory(parser)
-	return err
+	setDefaultConfigDirectory(parser)
 }
 
-func expandDefaultDownloadDirectory(parser *flags.Parser) error {
+func expandDefaultDownloadDirectory(parser *flags.Parser) {
 	option := parser.Command.FindOptionByLongName("download-directory")
 	if option == nil {
-		return fmt.Errorf("SHOULD NOT HAPPEN: option is nil")
+		panic("SHOULD NOT HAPPEN: option is nil")
 	}
 	path := option.Default[0]
 	newpath, err := homedir.Expand(path)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	option.Default[0] = newpath
 	option.DefaultMask = path
-	return nil
 }
 
-func setDefaultConfigDirectory(parser *flags.Parser) error {
+func setDefaultConfigDirectory(parser *flags.Parser) {
 	option := parser.Command.FindOptionByLongName("config-directory")
 	if option == nil {
-		return fmt.Errorf("SHOULD NOT HAPPEN: option is nil")
+		panic("SHOULD NOT HAPPEN: option is nil")
 	}
 	configpath := configdir.LocalConfig("FA Downloader")
 	option.Default = []string{configpath}
@@ -429,12 +421,11 @@ func setDefaultConfigDirectory(parser *flags.Parser) error {
 	// replace full path to home directory with ~
 	home, err := homedir.Dir()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	if strings.HasPrefix(configpath, home) {
 		option.DefaultMask = strings.Replace(configpath, home, "~", 1)
 	}
-	return nil
 }
 
 var last = time.Now()
