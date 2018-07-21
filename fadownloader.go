@@ -231,7 +231,7 @@ func main() {
 		}
 
 		wg.Add(1)
-		go func() {
+		go func(image url.URL, artist string, dbpool *sqlite.Pool, URL url.URL, counter int, length int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			filename := path.Base(image.Path)
 
@@ -323,7 +323,7 @@ func main() {
 				return
 			}
 			fmt.Printf("Saved %s (%v bytes)\n", filename, bytesWritten)
-		}()
+		}(*image, artist, dbpool, *URL, counter, len(keys), &wg)
 	}
 	wg.Wait()
 }
@@ -339,7 +339,7 @@ func dbMustExecute(db *sqlite.Conn, pragma string) {
 	}
 }
 
-func dbSetImageURL(dbpool *sqlite.Pool, URL *url.URL, image *url.URL, lastModified time.Time, filename string) error {
+func dbSetImageURL(dbpool *sqlite.Pool, URL url.URL, image url.URL, lastModified time.Time, filename string) error {
 	db := dbpool.Get(nil)
 	if db == nil {
 		return fmt.Errorf("Couldn't get db from dbpool")
