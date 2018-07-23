@@ -281,7 +281,7 @@ func main() {
 				if int64(contentLength) == stat.Size() {
 					// skip, file exists and size matches
 					lastModified = setimagetime(filepath)
-					fmt.Printf("[#%6d of %6d] Skipped %s (already exists)\n", counter, length, filename)
+					fmt.Printf("[#%6d of %6d] Skipped %s (already exists and filesize matches)\n", counter, length, filename)
 					// save to database
 					err = dbSetImageURL(dbpool, URL, image, lastModified, filename)
 					if err != nil {
