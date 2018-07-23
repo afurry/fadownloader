@@ -258,22 +258,27 @@ func main() {
 
 			// smaller scope so that we can close the file right after we're done with it
 			var lastModified time.Time
-			// request the image
-			req := fasthttp.AcquireRequest()
-			resp := fasthttp.AcquireResponse()
-			defer fasthttp.ReleaseRequest(req)
-			defer fasthttp.ReleaseResponse(resp)
-			req.SetRequestURI(image.String())
-			err = fasthttp.Do(req, resp)
-			if err != nil {
-				fmt.Printf("[#%6d of %6d] Failed to get URL '%s': %s\n", counter, length, image.String(), err)
-				return
+			var contentLength int64
+			// get image's size
+			{
+				req := fasthttp.AcquireRequest()
+				resp := fasthttp.AcquireResponse()
+				defer fasthttp.ReleaseRequest(req)
+				defer fasthttp.ReleaseResponse(resp)
+				req.SetRequestURI(image.String())
+				req.Header.SetMethod("HEAD")
+				err = fasthttp.Do(req, resp)
+				if err != nil {
+					fmt.Printf("[#%6d of %6d] Failed to HEAD on URL '%s': %s\n", counter, length, image.String(), err)
+					return
+				}
+				contentLength = int64(resp.Header.ContentLength())
 			}
 
 			// check if file exists and filesize matches
 			var stat os.FileInfo
 			if stat, err = os.Stat(filepath); err == nil {
-				if int64(resp.Header.ContentLength()) == stat.Size() {
+				if int64(contentLength) == stat.Size() {
 					// skip, file exists and size matches
 					lastModified = setimagetime(filepath)
 					fmt.Printf("[#%6d of %6d] Skipped %s (already exists)\n", counter, length, filename)
@@ -285,6 +290,18 @@ func main() {
 					}
 					return
 				}
+			}
+
+			// fetch the image
+			req := fasthttp.AcquireRequest()
+			resp := fasthttp.AcquireResponse()
+			defer fasthttp.ReleaseRequest(req)
+			defer fasthttp.ReleaseResponse(resp)
+			req.SetRequestURI(image.String())
+			err = fasthttp.Do(req, resp)
+			if err != nil {
+				fmt.Printf("[#%6d of %6d] Failed to get URL '%s': %s\n", counter, length, image.String(), err)
+				return
 			}
 
 			// create temporary download file
@@ -328,7 +345,7 @@ func main() {
 				fmt.Printf("[#%6d of %6d] Failed updating database: %s\n", counter, length, err)
 				return
 			}
-			fmt.Printf("[#%6d of %6d] Saved %s (%v bytes)\n", counter, length, filename, resp.Header.ContentLength())
+			fmt.Printf("[#%6d of %6d] Saved %s (%v bytes)\n", counter, length, filename, contentLength)
 		}(*image, artist, dbpool, *URL, counter, length, &wg)
 	}
 	wg.Wait()
