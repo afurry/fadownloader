@@ -69,8 +69,10 @@ var firstTenDigits = regexp.MustCompile(`^\d{10}`)
 var brokenFilename = regexp.MustCompile(`^\d{10}\.$`)
 
 func main() {
-	setupPprof()
-	defer pprofListener.Close()
+	err := setupPprof()
+	if err == nil {
+		defer pprofListener.Close()
+	}
 	parser := flags.NewParser(&opts, flags.PrintErrors|flags.PassDoubleDash|flags.PassAfterNonOption)
 
 	// set custom usage line
