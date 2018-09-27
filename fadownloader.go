@@ -134,7 +134,7 @@ func main() {
 	defer dbpool.Put(db)
 	fmt.Printf("\n")
 
-	imagePages := map[string]string{}
+	imagePages := map[string]*string{}
 
 	sort.Sort(sortorder.Natural(artists))
 	for i, artist := range artists {
@@ -166,10 +166,10 @@ func main() {
 				}
 
 				fmt.Printf(".")
-				newImagePages := map[*url.URL]string{}
+				newImagePages := map[*url.URL]*string{}
 				for _, link := range bow.Links() {
 					if strings.Contains(link.URL.Path, "/view/") {
-						newImagePages[link.URL] = artist
+						newImagePages[link.URL] = &artist
 					}
 					if link.Text == "Next  ❯❯" {
 						url := link.URL.String()
@@ -242,13 +242,13 @@ func main() {
 		}
 
 		wg.Add(1)
-		go func(image url.URL, artist string, dbpool *sqlite.Pool, URL url.URL, counter int, length int, wg *sync.WaitGroup) {
+		go func(image url.URL, artist *string, dbpool *sqlite.Pool, URL url.URL, counter int, length int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			filename := path.Base(image.Path)
 
 			// if it's "1234567890." (sometimes it happens), then append artist name
 			if m := brokenFilename.FindString(filename); len(m) != 0 {
-				filename = filename + artist + ".unnamedimage.jpg"
+				filename = filename + *artist + ".unnamedimage.jpg"
 			}
 
 			filepath := path.Join(opts.DownloadDirectory, filename)
