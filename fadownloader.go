@@ -138,7 +138,7 @@ func main() {
 
 	sort.Sort(sortorder.Natural(artists))
 	for i, artist := range artists {
-		fmt.Printf("Scanning artist %s (#%d of %d) for links...\n", artist, i, len(artists))
+		fmt.Printf("Scanning artist %s (#%d of %d) for links...\n", artist, i+1, len(artists))
 		pageTypes := []string{}
 		if !opts.NoGrabGallery {
 			pageTypes = append(pageTypes, "gallery")
@@ -205,7 +205,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	for counter, imagePage := range keys {
-		length := len(keys)
+		length := len(keys) - 1
 		URL, err := url.Parse(imagePage)
 		if err != nil {
 			fmt.Printf("Got error while parsing URL %s: %v\n", imagePage, err)
