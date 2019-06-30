@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,11 +22,10 @@ import (
 	"github.com/juju/persistent-cookiejar"
 	"github.com/kirsle/configdir"
 	"github.com/mitchellh/go-homedir"
-	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
 	"vbom.ml/util/sortorder"
 
-	"net/http/pprof"
+	_ "net/http/pprof"
 )
 
 func isResponseOK(response *http.Response) bool {
@@ -265,18 +265,15 @@ func main() {
 			var contentLength int64
 			// get image's size
 			{
-				req := fasthttp.AcquireRequest()
-				resp := fasthttp.AcquireResponse()
-				defer fasthttp.ReleaseRequest(req)
-				defer fasthttp.ReleaseResponse(resp)
-				req.SetRequestURI(image.String())
-				req.Header.SetMethod("HEAD")
-				err = fasthttp.Do(req, resp)
+				resp, err := http.Head(image.String())
 				if err != nil {
 					fmt.Printf("[#%6d of %6d] Failed to HEAD on URL '%s': %s\n", counter, length, image.String(), err)
 					return
 				}
-				contentLength = int64(resp.Header.ContentLength())
+				contentLength = resp.ContentLength
+				if resp.Body != nil {
+					resp.Body.Close()
+				}
 			}
 
 			// check if file exists and filesize matches
@@ -297,12 +294,10 @@ func main() {
 			}
 
 			// fetch the image
-			req := fasthttp.AcquireRequest()
-			resp := fasthttp.AcquireResponse()
-			defer fasthttp.ReleaseRequest(req)
-			defer fasthttp.ReleaseResponse(resp)
-			req.SetRequestURI(image.String())
-			err = fasthttp.Do(req, resp)
+			resp, err := http.Get(image.String())
+			if resp != nil { // even if err != nil, resp can be not nil as well
+				defer resp.Body.Close()
+			}
 			if err != nil {
 				fmt.Printf("[#%6d of %6d] Failed to get URL '%s': %s\n", counter, length, image.String(), err)
 				return
@@ -317,16 +312,22 @@ func main() {
 			defer out.Close()
 
 			// save the image
-			err = resp.BodyWriteTo(out)
+			// err = resp.BodyWriteTo(out)
+			written, err := io.Copy(out, resp.Body)
 			if err != nil {
 				fmt.Printf("[#%6d of %6d] Failed to download URL '%s': %s\n", counter, length, image.String(), err)
 				return
 			}
 
+			if written != contentLength {
+				fmt.Printf("[#%6d of %6d] Content length of %v != %v written, not marking as done\n", counter, length, contentLength, written)
+				return
+			}
+
 			// get last-modified
-			lastmod := resp.Header.Peek("Last-Modified")
+			lastmod := resp.Header.Get("Last-Modified")
 			if len(lastmod) != 0 {
-				lastModified, err = fasthttp.ParseHTTPDate(lastmod)
+				lastModified, err = time.Parse(time.RFC1123, lastmod)
 				if err != nil {
 					fmt.Printf("[#%6d of %6d] Failed to parse lastModified from %s, ignoring lastmodified: %s\n", counter, length, string(lastmod), err)
 					return
@@ -488,15 +489,8 @@ func setupPprof() error {
 		return err
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
 	go func() {
-		http.Serve(pprofListener, mux)
+		http.Serve(pprofListener, nil)
 	}()
 	return nil
 }
