@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"crawshaw.io/sqlite"
-	"crawshaw.io/sqlite/sqliteutil"
+	"crawshaw.io/sqlite/sqlitex"
 	"github.com/headzoo/surf"
 	"github.com/jessevdk/go-flags"
 	"github.com/juju/persistent-cookiejar"
@@ -116,7 +116,7 @@ func main() {
 	bow.HistoryJar().SetMax(1)
 
 	fmt.Printf("Opening database...")
-	dbpool, err := sqlite.Open(path.Join(opts.ConfigDir, "downloaded.sqlite"), 0, 100)
+	dbpool, err := sqlitex.Open(path.Join(opts.ConfigDir, "downloaded.sqlite"), 0, 100)
 	if err != nil {
 		panic(err)
 	}
@@ -242,7 +242,7 @@ func main() {
 		}
 
 		wg.Add(1)
-		go func(image url.URL, artist *string, dbpool *sqlite.Pool, URL url.URL, counter int, length int, wg *sync.WaitGroup) {
+		go func(image url.URL, artist *string, dbpool *sqlitex.Pool, URL url.URL, counter int, length int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			filename := path.Base(image.Path)
 
@@ -368,7 +368,7 @@ func dbCheckIfDownloaded(db *sqlite.Conn, URL *url.URL) (bool, error) {
 		filename = stmt.ColumnText(0)
 		return nil
 	}
-	err := sqliteutil.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
+	err := sqlitex.Exec(db, "SELECT filename FROM image_urls WHERE page_url = ? LIMIT 1", fn, dbkey)
 	if err != nil {
 		return false, err
 	} else if filename != "" {
@@ -378,13 +378,13 @@ func dbCheckIfDownloaded(db *sqlite.Conn, URL *url.URL) (bool, error) {
 }
 
 func dbMustExecute(db *sqlite.Conn, pragma string) {
-	err := sqliteutil.ExecTransient(db, pragma, nil)
+	err := sqlitex.ExecTransient(db, pragma, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to execute statement %s: %s", pragma, err))
 	}
 }
 
-func dbSetImageURL(dbpool *sqlite.Pool, URL url.URL, image url.URL, lastModified time.Time, filename string) error {
+func dbSetImageURL(dbpool *sqlitex.Pool, URL url.URL, image url.URL, lastModified time.Time, filename string) error {
 	db := dbpool.Get(nil)
 	if db == nil {
 		return fmt.Errorf("Couldn't get db from dbpool")
