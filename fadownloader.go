@@ -151,13 +151,10 @@ func main() {
 		}
 
 		for _, pageType := range pageTypes {
-			startPage := fmt.Sprintf("https://www.furaffinity.net/%s/%s/", pageType, artist)
-			nextPageLink := startPage
 			counter := 0
-			for nextPageLink != "" {
+			for {
 				counter++
-				galleryPage := nextPageLink
-				nextPageLink = ""
+				galleryPage := fmt.Sprintf("https://www.furaffinity.net/%s/%s/%d/", pageType, artist, counter)
 				fmt.Printf("Going to %s's %s page #%d...", artist, pageType, counter)
 				err := openURL(galleryPage)
 				if err != nil {
@@ -171,22 +168,24 @@ func main() {
 					if strings.Contains(link.URL.Path, "/view/") {
 						newImagePages[link.URL] = &artist
 					}
-					if link.Text == "Next  ❯❯" {
-						url := link.URL.String()
-						nextPageLink = url
-					}
 				}
 				newImageCount := 0
 				for k, v := range newImagePages {
 					// if already downloaded, don't add it
 					isDownloaded, _ := dbCheckIfDownloaded(db, k)
 					if !isDownloaded {
-						imagePages[k.String()] = v
-						newImageCount++
+						_, ok := imagePages[k.String()]
+						if !ok {
+							imagePages[k.String()] = v
+							newImageCount++
+						}
 					}
 				}
 				fmt.Printf(" Got %d valid and %d new images\n", len(newImagePages), newImageCount)
 				if !opts.NoFastScan && newImageCount == 0 {
+					break
+				}
+				if len(newImagePages) == 0 {
 					break
 				}
 			}
