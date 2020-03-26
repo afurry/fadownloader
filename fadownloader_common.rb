@@ -35,7 +35,7 @@ class AppConfig
 
   def initialize
     @data = {}
-    @data[:url_base] = 'http://www.furaffinity.net/'
+    @data[:url_base] = 'https://www.furaffinity.net/'
     @data[:url_login] = 'login'
     @data[:url_gallery] = 'gallery'
     @data[:url_favourites] = 'favorites'
