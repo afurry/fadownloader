@@ -3,8 +3,9 @@ module github.com/afurry/fadownloader
 go 1.13
 
 require (
-	crawshaw.io/sqlite v0.2.1
-	github.com/PuerkitoBio/goquery v1.5.0 // indirect
+	crawshaw.io/sqlite v0.3.2
+	github.com/PuerkitoBio/goquery v1.5.1 // indirect
+	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/headzoo/surf v1.0.1-0.20180909134844-a4a8c16c01dc
 	github.com/headzoo/ut v0.0.0-20181013193318-a13b5a7a02ca // indirect
 	github.com/jessevdk/go-flags v1.4.0
@@ -16,7 +17,7 @@ require (
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	go.uber.org/atomic v1.5.1 // indirect
 	go.uber.org/ratelimit v0.1.0
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	gopkg.in/errgo.v1 v1.0.1 // indirect
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787
