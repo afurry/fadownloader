@@ -98,7 +98,7 @@ while true do
 
   ## download gathered links
   counter = 0
-  pictures.keys.natural_sort.each do |key|
+  pictures.keys.natural_sort.reverse.each do |key|
     counter += 1
     # image without an href -- deleted image, don't download, already marked for removal by FA
     link = page.link_with(:href => key)
