@@ -24,6 +24,7 @@ require 'yaml'
 require 'singleton'
 require 'addressable/uri'
 require 'xdg'
+require 'pp'
 rescue LoadError => e
     print "Missing gems: #{e.inspect}\n\n"
     print "Do this: gem install mechanize naturalsort sqlite3 addressable xdg\n\n"
@@ -274,18 +275,18 @@ def downloadfrompage(key, agent, db)
   appconfig = AppConfig.instance
 
   # if in database, we've downloaded it already, return image filename
-  log_print "."
+  log_print "1"
   begin
     dbvalue, lastmod = db[key]
     if dbvalue != nil
       filename = File.basename(dbvalue)
-      logs " " + filename + " (already downloaded)"
+      logs "\b " + filename + " (already downloaded)"
       return filename
     end
   end
 
   ## get image page
-  log_print "."
+  log_print "\b2"
   artpage_uri = "#{appconfig[:url_base]}/#{key}"
   begin
     art_page = agent.get(artpage_uri.to_s)
@@ -298,7 +299,7 @@ def downloadfrompage(key, agent, db)
   end
 
   ## get image links from the page
-  log_print "."
+  log_print "\b3"
   begin
     imagelink = art_page.link_with(:text => /Download/)
     if (!imagelink)
@@ -314,13 +315,16 @@ def downloadfrompage(key, agent, db)
   end
 
   ## get filename and image creation time
-  log_print "."
+  log_print "\b4"
   filename = Addressable::URI.unencode_component(image_uri.basename)
-  filepath = "#{appconfig.download_directory}/#{filename}"
+  artistname = filename.scan(/^([0-9]{10}\.)([^._]+)[._]./)[0][1]
+  filedir = "#{appconfig.download_directory}/#{artistname}"
+  FileUtils.mkpath filedir
+  filepath = "#{filedir}/#{filename}"
   imagetime = (filename.scan(/\d{10}/)[0]).to_i
 
   ## do HEAD request and get file size
-  log_print "."
+  log_print "\b5"
   begin
     response = agent.head(image_uri.to_s)
   rescue Net::HTTPNotFound
@@ -334,16 +338,16 @@ def downloadfrompage(key, agent, db)
   imagesize = response["content-length"].to_i
 
   ## don't download if file exists and file size matches
-  log_print "."
+  log_print "\b6"
   if (File.exist?(filepath) && File.size(filepath) > 0 && File.size(filepath) == imagesize)
-    logs " #{filename} (file exists and size matches)"
+    logs "\b #{filename} (file exists and size matches)"
     setimagetime(filepath, imagetime)
     db.set_image_url(key, image_uri.to_s)
     return filename
   end
 
   ## get the image
-  log_print "."
+  log_print "\b7"
   begin
     image = agent.get(image_uri.to_s)
   rescue Timeout::Error
@@ -354,14 +358,16 @@ def downloadfrompage(key, agent, db)
     return nil
   end
 
-  log_print "."
+  log_print "\b8"
   last_modified = image.response["Last-Modified"]
-
-  log_print "."
   image.save!(filepath)
+
+  log_print "\b9"
   setimagetime(filepath, imagetime)
+
+  log_print "\ba"
   db.set_image_url(key, image_uri.to_s, last_modified)
 
-  logs " " + filename
+  logs "\b " + filename
   return filename
 end
