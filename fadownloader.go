@@ -17,13 +17,13 @@ import (
 
 	"crawshaw.io/sqlite"
 	"crawshaw.io/sqlite/sqlitex"
+	"github.com/fvbommel/util/sortorder"
 	"github.com/headzoo/surf"
 	"github.com/jessevdk/go-flags"
 	"github.com/juju/persistent-cookiejar"
 	"github.com/kirsle/configdir"
 	"github.com/mitchellh/go-homedir"
 	"go.uber.org/ratelimit"
-	"vbom.ml/util/sortorder"
 
 	_ "net/http/pprof"
 )
