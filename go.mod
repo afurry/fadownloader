@@ -4,8 +4,8 @@ go 1.15
 
 require (
 	crawshaw.io/sqlite v0.3.2
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
-	github.com/fvbommel/util v0.0.2
+	github.com/PuerkitoBio/goquery v1.6.0 // indirect
+	github.com/fvbommel/sortorder v1.0.2
 	github.com/headzoo/surf v1.0.1-0.20180909134844-a4a8c16c01dc
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
